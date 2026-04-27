@@ -70,12 +70,22 @@ async def pstryk_poll_job() -> None:
         logger.exception("Pstryk poll job crashed")
 
 
-async def pstryk_backfill_30d_job() -> None:
-    """At startup: ensure last 30 days + next 24 h of Pstryk metrics
-    (price + kwh + cost) are stored. Idempotent — historical chunks
-    that already have full kWh data are skipped, so a process restart
-    doesn't burn API quota re-fetching what we already have. The
-    forecast window is always fetched to refresh forward prices.
+BACKFILL_MAX_YEARS = 5
+BACKFILL_CHUNK_DAYS = 7
+BACKFILL_STOP_AFTER_EMPTY_CHUNKS = 2
+
+
+async def pstryk_backfill_all_job() -> None:
+    """At startup: ensure all available history of Pstryk metrics
+    (price + kwh + cost) is stored locally, plus the next 24 h of
+    forecast.
+
+    The job walks 7-day chunks backwards from "now" up to a 5-year
+    cap. It stops early after `BACKFILL_STOP_AFTER_EMPTY_CHUNKS`
+    consecutive chunks return zero rows (typically meaning Pstryk has
+    no contract / no meter data that far back). The skip-logic keeps
+    the job idempotent across restarts — chunks that already carry
+    both kwh_import and cost_pln are not re-fetched.
     """
     try:
         with Session(engine) as session:
@@ -87,19 +97,31 @@ async def pstryk_backfill_30d_job() -> None:
             return
 
         now = datetime.now(UTC)
-        windows = [(now, now + timedelta(days=1))]
-        for chunk_end_offset in range(0, 30, 7):
-            end = now - timedelta(days=chunk_end_offset)
-            windows.append((end - timedelta(days=7), end))
-
         async with PstrykClient(api_key=api_key) as client:
-            for window_start, window_end in windows:
-                if window_end <= now and _chunk_has_full_kwh(window_start, window_end):
+            # Forecast window — always fetched to refresh forward prices.
+            try:
+                payload = await client.fetch_unified_metrics(now, now + timedelta(days=1))
+                prices = parse_hourly_prices(payload)
+                with Session(engine) as session:
+                    upsert_pstryk_prices(session, prices)
+                logger.info("Backfill forecast chunk: %d rows", len(prices))
+            except PstrykAPIError as exc:
+                logger.warning("Backfill forecast chunk failed: %s", exc)
+
+            # History walk back from now. Stop after a couple of
+            # consecutive empty chunks (meter has no data that far back).
+            consecutive_empty = 0
+            max_chunks = (BACKFILL_MAX_YEARS * 366) // BACKFILL_CHUNK_DAYS + 1
+            for i in range(max_chunks):
+                window_end = now - timedelta(days=i * BACKFILL_CHUNK_DAYS)
+                window_start = window_end - timedelta(days=BACKFILL_CHUNK_DAYS)
+                if _chunk_has_full_kwh(window_start, window_end):
                     logger.info(
-                        "Backfill chunk %s..%s already hydrated, skipping",
+                        "Backfill %s..%s already hydrated, skipping",
                         window_start.date(),
                         window_end.date(),
                     )
+                    consecutive_empty = 0
                     continue
                 try:
                     payload = await client.fetch_unified_metrics(window_start, window_end)
@@ -107,14 +129,26 @@ async def pstryk_backfill_30d_job() -> None:
                     logger.warning("Backfill chunk failed: %s", exc)
                     continue
                 prices = parse_hourly_prices(payload)
+                rows_with_kwh = sum(1 for p in prices if p.kwh_import is not None)
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
                 logger.info(
-                    "Backfill chunk %s..%s: %d rows",
+                    "Backfill %s..%s: %d rows (%d with kwh)",
                     window_start.date(),
                     window_end.date(),
                     len(prices),
+                    rows_with_kwh,
                 )
+                if rows_with_kwh == 0:
+                    consecutive_empty += 1
+                    if consecutive_empty >= BACKFILL_STOP_AFTER_EMPTY_CHUNKS:
+                        logger.info(
+                            "Backfill stopped after %d consecutive empty chunks (history exhausted)",
+                            consecutive_empty,
+                        )
+                        break
+                else:
+                    consecutive_empty = 0
     except Exception:
         logger.exception("Pstryk backfill crashed")
 
@@ -241,7 +275,7 @@ def build_scheduler() -> AsyncIOScheduler:
         coalesce=True,
     )
     sched.add_job(
-        pstryk_backfill_30d_job,
+        pstryk_backfill_all_job,
         next_run_time=datetime.now(UTC) + timedelta(seconds=10),
         id="pstryk_backfill",
         max_instances=1,

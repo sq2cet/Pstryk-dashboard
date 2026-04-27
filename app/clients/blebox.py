@@ -63,9 +63,13 @@ class BleBoxReading:
     energy_kwh_total: float | None
     raw: dict
     reverse_energy_kwh_total: float | None = None
+    forward_reactive_energy_varh: float | None = None
+    reverse_reactive_energy_varh: float | None = None
+    apparent_energy_vah: float | None = None
     apparent_power_va: float | None = None
     reactive_power_var: float | None = None
     voltage_v: float | None = None
+    current_a: float | None = None
     frequency_hz: float | None = None
     phase_l1: PhaseReading | None = None
     phase_l2: PhaseReading | None = None
@@ -195,7 +199,11 @@ def parse_multisensor_state(payload: dict) -> BleBoxReading:
     aggregate = by_id.get(0, [])
     forward_wh = _find_sensor(aggregate, "forwardActiveEnergy")
     reverse_wh = _find_sensor(aggregate, "reverseActiveEnergy")
+    forward_react_wh = _find_sensor(aggregate, "forwardReactiveEnergy")
+    reverse_react_wh = _find_sensor(aggregate, "reverseReactiveEnergy")
+    apparent_wh = _find_sensor(aggregate, "apparentEnergy")
     voltage_dv = _find_sensor(aggregate, "voltage")
+    current_ma = _find_sensor(aggregate, "current")
     freq_mhz = _find_sensor(aggregate, "frequency")
 
     def _phase(sid: int) -> PhaseReading | None:
@@ -215,9 +223,13 @@ def parse_multisensor_state(payload: dict) -> BleBoxReading:
         active_power_w=_find_sensor(aggregate, "activePower"),
         energy_kwh_total=(forward_wh / 1000.0) if forward_wh is not None else None,
         reverse_energy_kwh_total=(reverse_wh / 1000.0) if reverse_wh is not None else None,
+        forward_reactive_energy_varh=forward_react_wh,
+        reverse_reactive_energy_varh=reverse_react_wh,
+        apparent_energy_vah=apparent_wh,
         apparent_power_va=_find_sensor(aggregate, "apparentPower"),
         reactive_power_var=_find_sensor(aggregate, "reactivePower"),
         voltage_v=(voltage_dv / 10.0) if voltage_dv is not None else None,
+        current_a=(current_ma / 1000.0) if current_ma is not None else None,
         frequency_hz=(freq_mhz / 1000.0) if freq_mhz is not None else None,
         phase_l1=_phase(1),
         phase_l2=_phase(2),

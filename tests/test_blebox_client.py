@@ -97,6 +97,10 @@ def test_parse_multisensor_filters_to_id0_and_converts_units() -> None:
     assert reading.reactive_power_var == -528.0
     # power factor = |520| / 933
     assert reading.power_factor == pytest.approx(520 / 933, abs=1e-3)
+    # Extra diagnostics: total current (mA -> A) + reactive/apparent energy
+    assert reading.current_a == pytest.approx(1.591)
+    assert reading.reverse_reactive_energy_varh == 59914.0
+    assert reading.apparent_energy_vah == 153609.0
 
 
 def test_parse_multisensor_extracts_per_phase() -> None:

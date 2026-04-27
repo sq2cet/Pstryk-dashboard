@@ -148,11 +148,10 @@ def cheapest_hours(request: Request, session: SessionDep) -> HTMLResponse:
     exp_sorted = sorted(rows, key=lambda r: r.price_pln_per_kwh, reverse=True)[:5]
     exp_sorted.sort(key=lambda r: r.ts_utc)
 
-    def fmt(r: PstrykPrice) -> tuple[str, float, bool]:
+    def fmt(r: PstrykPrice) -> tuple[str, str, float, bool]:
         local = to_local(r.ts_utc)
         is_today = local.date() == today_local
-        label = local.strftime("%H:%M") if is_today else "tom " + local.strftime("%H:%M")
-        return (label, r.price_pln_per_kwh, is_today)
+        return (local.strftime("%a"), local.strftime("%H:%M"), r.price_pln_per_kwh, is_today)
 
     return templates.TemplateResponse(
         request,

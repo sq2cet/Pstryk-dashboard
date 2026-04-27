@@ -139,3 +139,33 @@ def test_resolve_window_custom_requires_dates() -> None:
 
     with pytest.raises(ValueError):
         resolve_window("custom", ZoneInfo("UTC"))
+
+
+def test_resolve_window_last_month_is_previous_calendar_month() -> None:
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("UTC")
+    start, end, default_res = resolve_window("last_month", tz)
+    # Span at most 31 days, default resolution day.
+    assert default_res == "day"
+    assert (end - start).days in {28, 29, 30, 31}
+    # End is the first of this month at 00:00 local.
+    today_local = datetime.now(tz).date()
+    assert end.day == 1
+    assert end.month == today_local.month
+    assert end.year == today_local.year
+
+
+def test_resolve_window_last_year_spans_previous_calendar_year() -> None:
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("UTC")
+    start, end, default_res = resolve_window("last_year", tz)
+    today_local = datetime.now(tz).date()
+    assert default_res == "month"
+    assert start.year == today_local.year - 1
+    assert start.month == 1
+    assert start.day == 1
+    assert end.year == today_local.year
+    assert end.month == 1
+    assert end.day == 1

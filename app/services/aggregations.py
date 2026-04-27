@@ -23,7 +23,7 @@ from app.services.timeseries import (
 )
 
 Resolution = Literal["hour", "day", "month", "year"]
-RangePreset = Literal["24h", "today", "week", "month", "year", "custom"]
+RangePreset = Literal["24h", "today", "week", "month", "last_month", "year", "last_year", "custom"]
 
 
 @dataclass(frozen=True)
@@ -88,11 +88,28 @@ def resolve_window(
             end_local = start_local.replace(month=start_local.month + 1)
         return _to_utc_naive(start_local), _to_utc_naive(end_local), "day"
 
+    if range_ == "last_month":
+        first_of_this_month = today_local.replace(day=1)
+        # The day before is somewhere in the previous calendar month.
+        last_day_of_prev = first_of_this_month - timedelta(days=1)
+        start_local = datetime.combine(last_day_of_prev.replace(day=1), time.min).replace(tzinfo=tz)
+        end_local = datetime.combine(first_of_this_month, time.min).replace(tzinfo=tz)
+        return _to_utc_naive(start_local), _to_utc_naive(end_local), "day"
+
     if range_ == "year":
         start_local = datetime.combine(today_local.replace(month=1, day=1), time.min).replace(
             tzinfo=tz
         )
         end_local = start_local.replace(year=start_local.year + 1)
+        return _to_utc_naive(start_local), _to_utc_naive(end_local), "month"
+
+    if range_ == "last_year":
+        start_local = datetime.combine(
+            today_local.replace(year=today_local.year - 1, month=1, day=1), time.min
+        ).replace(tzinfo=tz)
+        end_local = datetime.combine(today_local.replace(month=1, day=1), time.min).replace(
+            tzinfo=tz
+        )
         return _to_utc_naive(start_local), _to_utc_naive(end_local), "month"
 
     if range_ == "custom":

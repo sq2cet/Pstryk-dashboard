@@ -13,18 +13,6 @@
       </div>
     </div>
     <div class="live-cell">
-      <div class="live-label">Price</div>
-      <div class="live-value">
-        {% if current_price_pln_per_kwh is not none %}
-          {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
-          {% if is_cheap_now %}<span class="pill pill-ok">cheap</span>{% endif %}
-          {% if is_expensive_now %}<span class="pill pill-warn">expensive</span>{% endif %}
-        {% else %}
-          <span class="muted">—</span>
-        {% endif %}
-      </div>
-    </div>
-    <div class="live-cell">
       <div class="live-label">Today</div>
       <div class="live-value">
         {{ "%.2f"|format(today_kwh) }} <small>kWh</small>
@@ -43,6 +31,18 @@
       <div class="live-value">
         {{ "%.0f"|format(year_kwh) }} <small>kWh</small>
         <span class="muted small"> · {{ "%.0f"|format(year_cost_pln) }} PLN</span>
+      </div>
+    </div>
+    <div class="live-cell">
+      <div class="live-label">Price</div>
+      <div class="live-value">
+        {% if current_price_pln_per_kwh is not none %}
+          {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
+          {% if is_cheap_now %}<span class="pill pill-ok">cheap</span>{% endif %}
+          {% if is_expensive_now %}<span class="pill pill-warn">expensive</span>{% endif %}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -82,6 +82,12 @@
       <span>{{ "%.1f"|format(reading.voltage_v) }} V</span>
     </div>
     {% endif %}
+    {% if reading.current_a is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Current</span>
+      <span>{{ "%.2f"|format(reading.current_a) }} A</span>
+    </div>
+    {% endif %}
     {% if reading.frequency_hz is not none %}
     <div class="diag-cell">
       <span class="muted small">Frequency</span>
@@ -108,14 +114,32 @@
     {% endif %}
     {% if reading.energy_kwh_total is not none %}
     <div class="diag-cell">
-      <span class="muted small">Forward (import)</span>
+      <span class="muted small">Active in (forward)</span>
       <span>{{ "%.3f"|format(reading.energy_kwh_total) }} kWh</span>
     </div>
     {% endif %}
     {% if reading.reverse_energy_kwh_total is not none %}
     <div class="diag-cell">
-      <span class="muted small">Reverse (export)</span>
+      <span class="muted small">Active out (reverse)</span>
       <span>{{ "%.3f"|format(reading.reverse_energy_kwh_total) }} kWh</span>
+    </div>
+    {% endif %}
+    {% if reading.forward_reactive_energy_varh is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Reactive in</span>
+      <span>{{ "%.0f"|format(reading.forward_reactive_energy_varh) }} varh</span>
+    </div>
+    {% endif %}
+    {% if reading.reverse_reactive_energy_varh is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Reactive out</span>
+      <span>{{ "%.0f"|format(reading.reverse_reactive_energy_varh) }} varh</span>
+    </div>
+    {% endif %}
+    {% if reading.apparent_energy_vah is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Apparent total</span>
+      <span>{{ "%.0f"|format(reading.apparent_energy_vah) }} VAh</span>
     </div>
     {% endif %}
   </div>

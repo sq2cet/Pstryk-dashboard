@@ -34,6 +34,8 @@
       "sensors": [
         {"id": 0, "type": "forwardActiveEnergy", "value": 109443, "state": 2},
         {"id": 0, "type": "reverseActiveEnergy", "value": 0, "state": 2},
+        {"id": 0, "type": "forwardReactiveEnergy", "value": 0, "state": 2},
+        {"id": 0, "type": "reverseReactiveEnergy", "value": 59914, "state": 2},
         {"id": 0, "type": "apparentEnergy", "value": 153609, "state": 2},
         {"id": 0, "type": "activePower", "value": 520, "state": 2},
         {"id": 0, "type": "reactivePower", "value": -528, "state": 2},

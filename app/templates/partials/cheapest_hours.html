@@ -1,6 +1,6 @@
 {# Cheapest / most-expensive remaining hours of today + tomorrow.
    Tomorrow's prices are typically published by Pstryk around midday today;
-   the "tom HH:MM" labels appear in the lists once they land. #}
+   the labels carry a 3-letter weekday + HH:MM (e.g. "Mon 14:00"). #}
 {% if not have_forecast %}
   <div class="muted">
     No forecast prices yet — they appear after the next Pstryk poll
@@ -13,9 +13,9 @@
         Cheapest hours · today{% if have_tomorrow %} + tomorrow{% endif %}
       </div>
       <ul class="forecast-list forecast-cheap">
-        {% for label, price, is_today in cheapest %}
+        {% for day, time, price, is_today in cheapest %}
           <li>
-            <span>{% if not is_today %}<small class="muted">tom</small> {% endif %}{{ label.replace('tom ', '') }}</span>
+            <span><small class="muted">{{ day }}</small> {{ time }}</span>
             <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
           </li>
         {% endfor %}
@@ -26,9 +26,9 @@
         Most expensive hours · today{% if have_tomorrow %} + tomorrow{% endif %}
       </div>
       <ul class="forecast-list forecast-exp">
-        {% for label, price, is_today in expensive %}
+        {% for day, time, price, is_today in expensive %}
           <li>
-            <span>{% if not is_today %}<small class="muted">tom</small> {% endif %}{{ label.replace('tom ', '') }}</span>
+            <span><small class="muted">{{ day }}</small> {{ time }}</span>
             <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
           </li>
         {% endfor %}
