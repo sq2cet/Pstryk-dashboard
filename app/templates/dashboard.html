@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div id="health-status"
+     hx-get="/partials/health-status"
+     hx-trigger="load, every 30s"
+     hx-swap="innerHTML">
+</div>
+
 <div id="backfill-status"
      hx-get="/partials/backfill-status"
      hx-trigger="load, every 5s"
@@ -38,6 +44,7 @@
       <select name="range" id="f-range">
         <option value="24h">Last 24 h</option>
         <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
         <option value="week">Last 7 days</option>
         <option value="month">This month</option>
         <option value="last_month">Last month</option>

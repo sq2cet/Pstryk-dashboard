@@ -18,7 +18,7 @@ after a restart.
 from __future__ import annotations
 
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.clients.blebox import BleBoxReading
 
@@ -37,6 +37,27 @@ backfill_rows_loaded: int = 0
 backfill_started_at: datetime | None = None
 backfill_finished_at: datetime | None = None
 
+# Last error reported by the Pstryk / BleBox jobs. Set by scheduler
+# tasks on failure, cleared on the next successful call. The
+# /partials/health-status banner reads these and renders a yellow
+# banner if either is non-None.
+pstryk_last_error: str | None = None
+pstryk_last_error_at: datetime | None = None
+blebox_last_error: str | None = None
+blebox_last_error_at: datetime | None = None
+
+
+def set_pstryk_error(message: str | None) -> None:
+    global pstryk_last_error, pstryk_last_error_at
+    pstryk_last_error = message
+    pstryk_last_error_at = datetime.now(UTC).replace(tzinfo=None) if message else None
+
+
+def set_blebox_error(message: str | None) -> None:
+    global blebox_last_error, blebox_last_error_at
+    blebox_last_error = message
+    blebox_last_error_at = datetime.now(UTC).replace(tzinfo=None) if message else None
+
 
 def set_last_reading(reading: BleBoxReading | None) -> None:
     global last_reading
@@ -47,9 +68,14 @@ def set_last_reading(reading: BleBoxReading | None) -> None:
 
 def reset_buffers() -> None:
     """Clear in-memory state. Used by tests and on settings rotation."""
-    global last_reading
+    global last_reading, pstryk_last_error, blebox_last_error
+    global pstryk_last_error_at, blebox_last_error_at
     last_reading = None
     recent_readings.clear()
+    pstryk_last_error = None
+    pstryk_last_error_at = None
+    blebox_last_error = None
+    blebox_last_error_at = None
 
 
 def backfill_start() -> None:
@@ -59,7 +85,7 @@ def backfill_start() -> None:
     backfill_message = "Downloading historical data..."
     backfill_chunks_done = 0
     backfill_rows_loaded = 0
-    backfill_started_at = datetime.utcnow()
+    backfill_started_at = datetime.now(UTC).replace(tzinfo=None)
     backfill_finished_at = None
 
 
@@ -74,11 +100,11 @@ def backfill_done(message: str = "Historical data downloaded.") -> None:
     global backfill_status, backfill_message, backfill_finished_at
     backfill_status = "complete"
     backfill_message = message
-    backfill_finished_at = datetime.utcnow()
+    backfill_finished_at = datetime.now(UTC).replace(tzinfo=None)
 
 
 def backfill_failed(message: str) -> None:
     global backfill_status, backfill_message, backfill_finished_at
     backfill_status = "failed"
     backfill_message = message
-    backfill_finished_at = datetime.utcnow()
+    backfill_finished_at = datetime.now(UTC).replace(tzinfo=None)

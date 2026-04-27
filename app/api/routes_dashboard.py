@@ -118,6 +118,25 @@ def live_tile(request: Request, session: SessionDep) -> HTMLResponse:
     return templates.TemplateResponse(request, "partials/live_tile.html", ctx)
 
 
+@router.get("/partials/health-status", response_class=HTMLResponse)
+def health_status(request: Request) -> HTMLResponse:
+    """Render a banner if Pstryk or BleBox jobs reported errors recently.
+
+    Returns an empty body when both feeds are healthy so the HTMX swap
+    target collapses to nothing.
+    """
+    if state.pstryk_last_error is None and state.blebox_last_error is None:
+        return HTMLResponse("")
+    return templates.TemplateResponse(
+        request,
+        "partials/health_status.html",
+        {
+            "pstryk_error": state.pstryk_last_error,
+            "blebox_error": state.blebox_last_error,
+        },
+    )
+
+
 @router.get("/partials/backfill-status", response_class=HTMLResponse)
 def backfill_status(request: Request) -> HTMLResponse:
     """Render the historical-data download banner.

@@ -23,7 +23,17 @@ from app.services.timeseries import (
 )
 
 Resolution = Literal["hour", "day", "month", "year"]
-RangePreset = Literal["24h", "today", "week", "month", "last_month", "year", "last_year", "custom"]
+RangePreset = Literal[
+    "24h",
+    "today",
+    "yesterday",
+    "week",
+    "month",
+    "last_month",
+    "year",
+    "last_year",
+    "custom",
+]
 
 
 @dataclass(frozen=True)
@@ -73,6 +83,11 @@ def resolve_window(
 
     if range_ == "today":
         start_local = datetime.combine(today_local, time.min).replace(tzinfo=tz)
+        return _to_utc_naive(start_local), _to_utc_naive(start_local + timedelta(days=1)), "hour"
+
+    if range_ == "yesterday":
+        yesterday = today_local - timedelta(days=1)
+        start_local = datetime.combine(yesterday, time.min).replace(tzinfo=tz)
         return _to_utc_naive(start_local), _to_utc_naive(start_local + timedelta(days=1)), "hour"
 
     if range_ == "week":

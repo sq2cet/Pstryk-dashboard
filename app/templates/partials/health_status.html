@@ -1,0 +1,9 @@
+{# Visible when Pstryk or BleBox jobs reported errors recently. #}
+<div class="banner banner--warn">
+  <strong>⚠ Connection issues</strong>
+  {% if pstryk_error %}<div class="small">Pstryk: {{ pstryk_error }}</div>{% endif %}
+  {% if blebox_error %}<div class="small">BleBox: {{ blebox_error }}</div>{% endif %}
+  <div class="muted small" style="margin-top: 0.4rem;">
+    Banner clears automatically on the next successful poll.
+  </div>
+</div>

@@ -15,15 +15,23 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlmodel import Session, select
 
-from app.clients.blebox import BleBoxClient, BleBoxError
+from app import state
+from app.clients.blebox import (
+    BleBoxClient,
+    BleBoxError,
+    UnsupportedBleBoxDevice,
+)
 from app.clients.pstryk import (
     PstrykAPIError,
+    PstrykAuthError,
     PstrykClient,
+    PstrykRateLimitError,
     parse_hourly_prices,
 )
 from app.db import engine
@@ -69,15 +77,39 @@ async def pstryk_poll_job() -> None:
         prices = parse_hourly_prices(payload)
         if not prices:
             logger.warning("Pstryk poll returned no parseable prices")
+            state.set_pstryk_error("Pstryk returned no price data for the polling window.")
             return
 
         with Session(engine) as session:
             written = upsert_pstryk_prices(session, prices)
         logger.info("Pstryk poll: refreshed %d hourly rows over the last 7 d + 24 h", written)
+        state.set_pstryk_error(None)
+    except PstrykAuthError as exc:
+        logger.warning("Pstryk auth failed: %s", exc)
+        state.set_pstryk_error("Invalid Pstryk API key (HTTP 401/403). Update it in /settings.")
+    except PstrykRateLimitError as exc:
+        logger.warning("Pstryk rate limit: %s", exc)
+        state.set_pstryk_error(
+            "Pstryk rate limit hit (3 req/h per endpoint). Lower the poll cadence in /settings."
+        )
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        logger.warning("Pstryk HTTP %s: %s", code, exc)
+        if code == 404:
+            state.set_pstryk_error(
+                "Pstryk meter / contract not found (HTTP 404). Check the API key's account."
+            )
+        else:
+            state.set_pstryk_error(f"Pstryk request failed: HTTP {code}.")
+    except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as exc:
+        logger.warning("Pstryk network error: %s", exc)
+        state.set_pstryk_error(f"Cannot reach api.pstryk.pl: {type(exc).__name__}.")
     except PstrykAPIError as exc:
         logger.warning("Pstryk poll API error: %s", exc)
-    except Exception:
+        state.set_pstryk_error(f"Pstryk API error: {exc}")
+    except Exception as exc:
         logger.exception("Pstryk poll job crashed")
+        state.set_pstryk_error(f"Unexpected error: {type(exc).__name__}.")
 
 
 BACKFILL_MAX_YEARS = 5
@@ -97,8 +129,6 @@ async def pstryk_backfill_all_job() -> None:
     the job idempotent across restarts — chunks that already carry
     both kwh_import and cost_pln are not re-fetched.
     """
-    from app import state
-
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
@@ -217,8 +247,6 @@ async def blebox_live_job() -> None:
     Runs every `blebox_live_seconds` (default 5 s). The 60 s persist
     job reads the cached reading rather than re-hitting the device.
     """
-    from app import state
-
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
@@ -230,16 +258,31 @@ async def blebox_live_job() -> None:
         async with BleBoxClient(host=host, port=port) as client:
             reading = await client.read_state()
         state.set_last_reading(reading)
+        state.set_blebox_error(None)
+    except UnsupportedBleBoxDevice as exc:
+        logger.warning("BleBox unsupported device: %s", exc)
+        state.set_blebox_error(f"BleBox device not supported: {exc}")
+    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        logger.warning("BleBox connect failure: %s", exc)
+        state.set_blebox_error(f"Cannot reach BleBox at {host}:{port}. Check the IP in /settings.")
+    except httpx.ReadTimeout:
+        logger.warning("BleBox read timeout")
+        state.set_blebox_error(f"BleBox at {host}:{port} did not respond in time.")
+    except httpx.HTTPStatusError as exc:
+        logger.warning("BleBox HTTP %s: %s", exc.response.status_code, exc)
+        state.set_blebox_error(
+            f"BleBox returned HTTP {exc.response.status_code}. Firmware/path mismatch?"
+        )
     except BleBoxError as exc:
         logger.warning("BleBox live job error: %s", exc)
-    except Exception:
+        state.set_blebox_error(f"BleBox error: {exc}")
+    except Exception as exc:
         logger.exception("BleBox live job crashed")
+        state.set_blebox_error(f"Unexpected error: {type(exc).__name__}.")
 
 
 def blebox_persist_job() -> None:
     """Persist the most recent cached BleBox reading to MeterReading."""
-    from app import state
-
     try:
         reading = state.last_reading
         if reading is None:
