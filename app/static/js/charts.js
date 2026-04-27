@@ -223,8 +223,15 @@
   }
 
   fRange.addEventListener("change", () => {
-    showCustomInputs(fRange.value === "custom");
-    if (fRange.value !== "custom") refresh();
+    const isCustom = fRange.value === "custom";
+    showCustomInputs(isCustom);
+    if (!isCustom) {
+      // Clear stale custom dates so the inputs read "dd/mm/yyyy"
+      // again the next time the user opens Custom.
+      fFrom.value = "";
+      fTo.value = "";
+      refresh();
+    }
   });
   fResolution.addEventListener("change", refresh);
   fFrom.addEventListener("change", refresh);

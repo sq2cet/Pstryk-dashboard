@@ -352,4 +352,15 @@ def build_scheduler() -> AsyncIOScheduler:
         id="pstryk_backfill",
         max_instances=1,
     )
+    # Daily idempotent re-run: fills gaps left by transient failures
+    # (429, network blips) on the original startup walk. Skip-logic
+    # makes already-hydrated chunks free; only "missing kwh" chunks
+    # get refetched, so this costs at most a handful of API calls.
+    sched.add_job(
+        pstryk_backfill_all_job,
+        CronTrigger(hour=3, minute=0, timezone=view.tz),
+        id="pstryk_backfill_daily",
+        max_instances=1,
+        coalesce=True,
+    )
     return sched
