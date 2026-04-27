@@ -6,7 +6,7 @@ from sqlmodel import Session
 from app.clients.blebox import BleBoxReading
 from app.clients.pstryk import HourlyPrice
 from app.db import engine
-from app.services.aggregations import aggregate_range, resolve_window
+from app.services.aggregations import aggregate_range, period_totals, resolve_window
 from app.services.ingest import record_meter_reading, upsert_pstryk_prices
 
 
@@ -93,6 +93,36 @@ def test_daily_aggregate_collapses_hours_in_local_tz(session: Session) -> None:
     assert rows[0].cost_pln == pytest.approx(1.0)
     assert rows[0].min_price_pln_per_kwh == 0.40
     assert rows[0].max_price_pln_per_kwh == 0.60
+
+
+def test_period_totals_sums_pstryk_first(session: Session) -> None:
+    upsert_pstryk_prices(
+        session,
+        [
+            HourlyPrice(
+                ts_utc=_ts(2026, 4, 27, 10, 0, 0),
+                price_pln_per_kwh=0.50,
+                kind="historical",
+                kwh_import=2.0,
+                cost_pln=1.10,
+            ),
+            HourlyPrice(
+                ts_utc=_ts(2026, 4, 27, 11, 0, 0),
+                price_pln_per_kwh=0.60,
+                kind="historical",
+                kwh_import=1.5,
+                cost_pln=0.90,
+            ),
+        ],
+    )
+    totals = period_totals(
+        session,
+        _ts(2026, 4, 27, 10, 0, 0),
+        _ts(2026, 4, 27, 12, 0, 0),
+    )
+    assert totals["kwh"] == pytest.approx(3.5)
+    assert totals["cost_pln"] == pytest.approx(2.0)
+    assert totals["avg_price_pln_per_kwh"] == pytest.approx(2.0 / 3.5)
 
 
 def test_resolve_window_today_uses_local_midnight() -> None:

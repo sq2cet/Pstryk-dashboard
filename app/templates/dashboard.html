@@ -66,7 +66,6 @@
     <div class="total-cell"><span class="muted small">Avg price</span><span id="t-avg">—</span></div>
     <div class="total-cell"><span class="muted small">Min price</span><span id="t-min">—</span></div>
     <div class="total-cell"><span class="muted small">Max price</span><span id="t-max">—</span></div>
-    <div class="total-cell"><span class="muted small">Buckets</span><span id="t-count">—</span></div>
   </div>
 </section>
 
@@ -82,11 +81,11 @@
 
 <section class="card chart-card">
   <header class="chart-header">
-    <h2>Cumulative cost</h2>
-    <span class="muted small">running total over the selected range</span>
+    <h2>Cost &amp; consumption</h2>
+    <span class="muted small">per-bucket cost (line) overlaid on consumption (bars)</span>
   </header>
-  <div class="chart-wrap chart-wrap-short">
-    <canvas id="chart-cumcost" aria-label="Cumulative cost over range"></canvas>
+  <div class="chart-wrap">
+    <canvas id="chart-cost-consumption" aria-label="Cost and consumption per bucket"></canvas>
   </div>
 </section>
 

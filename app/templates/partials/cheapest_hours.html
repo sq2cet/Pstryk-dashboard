@@ -1,4 +1,6 @@
-{# Cheapest / most-expensive hours in the next 24 h forecast. #}
+{# Cheapest / most-expensive remaining hours of today + tomorrow.
+   Tomorrow's prices are typically published by Pstryk around midday today;
+   the "tom HH:MM" labels appear in the lists once they land. #}
 {% if not have_forecast %}
   <div class="muted">
     No forecast prices yet — they appear after the next Pstryk poll
@@ -7,26 +9,35 @@
 {% else %}
   <div class="forecast-grid">
     <div>
-      <div class="forecast-label muted small">Cheapest 5 next 24 h</div>
+      <div class="forecast-label muted small">
+        Cheapest hours · today{% if have_tomorrow %} + tomorrow{% endif %}
+      </div>
       <ul class="forecast-list forecast-cheap">
-        {% for label, price in cheapest %}
+        {% for label, price, is_today in cheapest %}
           <li>
-            <span>{{ label }}</span>
+            <span>{% if not is_today %}<small class="muted">tom</small> {% endif %}{{ label.replace('tom ', '') }}</span>
             <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
           </li>
         {% endfor %}
       </ul>
     </div>
     <div>
-      <div class="forecast-label muted small">Most expensive 3 next 24 h</div>
+      <div class="forecast-label muted small">
+        Most expensive hours · today{% if have_tomorrow %} + tomorrow{% endif %}
+      </div>
       <ul class="forecast-list forecast-exp">
-        {% for label, price in expensive %}
+        {% for label, price, is_today in expensive %}
           <li>
-            <span>{{ label }}</span>
+            <span>{% if not is_today %}<small class="muted">tom</small> {% endif %}{{ label.replace('tom ', '') }}</span>
             <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
           </li>
         {% endfor %}
       </ul>
     </div>
   </div>
+  {% if not have_tomorrow %}
+    <div class="muted small" style="margin-top: 0.6rem;">
+      Tomorrow's prices haven't been published yet — they appear around midday.
+    </div>
+  {% endif %}
 {% endif %}

@@ -13,9 +13,14 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from app.services.timeseries import hour_buckets, hourly_metrics
+from app.models import PstrykPrice
+from app.services.timeseries import (
+    hour_buckets,
+    hourly_consumption_kwh,
+    hourly_metrics,
+)
 
 Resolution = Literal["hour", "day", "month", "year"]
 RangePreset = Literal["24h", "today", "week", "month", "year", "custom"]
@@ -100,6 +105,50 @@ def resolve_window(
         return _to_utc_naive(start_local), _to_utc_naive(end_local), "day"
 
     raise ValueError(f"unknown range preset: {range_}")
+
+
+def period_totals(session: Session, start_utc: datetime, end_utc: datetime) -> dict:
+    """Sum kWh + cost across [start, end), Pstryk-first.
+
+    Used by the live tile's Today / This month / This year cells. We
+    sum Pstryk's stored hourly meter values + cost first (authoritative
+    for any hour Pstryk has reported), then add a single BleBox-derived
+    contribution for the *current* hour when Pstryk hasn't reported it
+    yet — that's the only place the live BleBox feed is needed for
+    these cells.
+    """
+    rows = session.exec(
+        select(PstrykPrice)
+        .where(PstrykPrice.ts_utc >= start_utc)
+        .where(PstrykPrice.ts_utc < end_utc)
+    ).all()
+
+    total_kwh = 0.0
+    total_cost = 0.0
+    pstryk_hours_with_kwh: set[datetime] = set()
+    for r in rows:
+        if r.kwh_import is not None:
+            total_kwh += r.kwh_import
+            pstryk_hours_with_kwh.add(r.ts_utc)
+        if r.cost_pln is not None:
+            total_cost += r.cost_pln
+
+    current_hour = datetime.now(UTC).replace(tzinfo=None).replace(minute=0, second=0, microsecond=0)
+    if start_utc <= current_hour < end_utc and current_hour not in pstryk_hours_with_kwh:
+        bb_kwh = hourly_consumption_kwh(
+            session, current_hour, current_hour + timedelta(hours=1)
+        ).get(current_hour, 0.0)
+        if bb_kwh > 0:
+            current_row = next((r for r in rows if r.ts_utc == current_hour), None)
+            price = current_row.price_pln_per_kwh if current_row is not None else 0.0
+            total_kwh += bb_kwh
+            total_cost += bb_kwh * price
+
+    return {
+        "kwh": total_kwh,
+        "cost_pln": total_cost,
+        "avg_price_pln_per_kwh": (total_cost / total_kwh) if total_kwh > 0 else 0.0,
+    }
 
 
 def _bucket_key_for(b_utc: datetime, resolution: Resolution, tz: ZoneInfo) -> datetime:

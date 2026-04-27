@@ -16,7 +16,7 @@ from app import state
 from app.db import get_session
 from app.models import PstrykPrice, utcnow_naive
 from app.services import settings_service as svc
-from app.services.cost import compute_day, compute_range
+from app.services.aggregations import period_totals
 from app.services.ingest import latest_price_at
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -30,6 +30,13 @@ def _local_day_window_utc(tz: ZoneInfo, days_back: int = 0):
     today = datetime.now(tz).date() - timedelta(days=days_back)
     start_local = datetime.combine(today, time.min).replace(tzinfo=tz)
     end_local = start_local + timedelta(days=1)
+    return _to_utc_naive(start_local), _to_utc_naive(end_local)
+
+
+def _today_and_tomorrow_window_utc(tz: ZoneInfo):
+    today = datetime.now(tz).date()
+    start_local = datetime.combine(today, time.min).replace(tzinfo=tz)
+    end_local = datetime.combine(today + timedelta(days=2), time.min).replace(tzinfo=tz)
     return _to_utc_naive(start_local), _to_utc_naive(end_local)
 
 
@@ -58,16 +65,20 @@ def _to_utc_naive(dt: datetime) -> datetime:
 def live_tile(request: Request, session: SessionDep) -> HTMLResponse:
     view = svc.get_view(session)
     tz = ZoneInfo(view.tz)
-    today_local = datetime.now(tz).date()
 
     reading = state.last_reading
     current_price = latest_price_at(session, utcnow_naive())
 
-    today_totals = compute_day(session, today_local, tz_name=view.tz)
+    # Today / This month / This year all draw from Pstryk's stored
+    # hourly meter values + cost (authoritative). The current hour,
+    # which Pstryk hasn't reported yet, falls back to BleBox-derived
+    # kWh × the stored hourly tariff.
+    day_start, day_end = _local_day_window_utc(tz)
+    today_totals = period_totals(session, day_start, day_end)
     month_start, month_end = _local_month_window_utc(tz)
-    month_totals = compute_range(session, month_start, month_end)
+    month_totals = period_totals(session, month_start, month_end)
     year_start, year_end = _local_year_window_utc(tz)
-    year_totals = compute_range(session, year_start, year_end)
+    year_totals = period_totals(session, year_start, year_end)
 
     is_cheap_now = False
     is_expensive_now = False
@@ -96,12 +107,12 @@ def live_tile(request: Request, session: SessionDep) -> HTMLResponse:
         ),
         "is_cheap_now": is_cheap_now,
         "is_expensive_now": is_expensive_now,
-        "today_kwh": today_totals.kwh,
-        "today_cost_pln": today_totals.cost_pln,
-        "month_kwh": month_totals.kwh,
-        "month_cost_pln": month_totals.cost_pln,
-        "year_kwh": year_totals.kwh,
-        "year_cost_pln": year_totals.cost_pln,
+        "today_kwh": today_totals["kwh"],
+        "today_cost_pln": today_totals["cost_pln"],
+        "month_kwh": month_totals["kwh"],
+        "month_cost_pln": month_totals["cost_pln"],
+        "year_kwh": year_totals["kwh"],
+        "year_cost_pln": year_totals["cost_pln"],
         "live_updated_at": reading.ts_utc if reading is not None else None,
     }
     return templates.TemplateResponse(request, "partials/live_tile.html", ctx)
@@ -109,33 +120,47 @@ def live_tile(request: Request, session: SessionDep) -> HTMLResponse:
 
 @router.get("/partials/cheapest-hours", response_class=HTMLResponse)
 def cheapest_hours(request: Request, session: SessionDep) -> HTMLResponse:
-    """The cheapest forecast hours in the next 24 h."""
+    """The cheapest / most-expensive remaining hours of today plus all
+    of tomorrow. Tomorrow's prices are typically published by Pstryk
+    around midday today; the card's tomorrow column fills in then.
+    """
     view = svc.get_view(session)
     tz = ZoneInfo(view.tz)
-    now = utcnow_naive()
-    end = now + timedelta(hours=24)
+    now_hour = utcnow_naive().replace(minute=0, second=0, microsecond=0)
+    _, window_end = _today_and_tomorrow_window_utc(tz)
 
-    rows = session.exec(
-        select(PstrykPrice)
-        .where(PstrykPrice.ts_utc >= now.replace(minute=0, second=0, microsecond=0))
-        .where(PstrykPrice.ts_utc < end)
-        .order_by(PstrykPrice.price_pln_per_kwh)
-    ).all()
+    rows = list(
+        session.exec(
+            select(PstrykPrice)
+            .where(PstrykPrice.ts_utc >= now_hour)
+            .where(PstrykPrice.ts_utc < window_end)
+            .order_by(PstrykPrice.ts_utc)
+        ).all()
+    )
 
-    cheapest = list(rows[:5])
-    cheapest.sort(key=lambda r: r.ts_utc)
-    expensive = sorted(rows, key=lambda r: r.price_pln_per_kwh, reverse=True)[:3]
-    expensive.sort(key=lambda r: r.ts_utc)
+    today_local = datetime.now(tz).date()
 
-    def to_local_str(dt: datetime) -> str:
-        return dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).strftime("%a %H:%M")
+    def to_local(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+
+    cheap_sorted = sorted(rows, key=lambda r: r.price_pln_per_kwh)[:8]
+    cheap_sorted.sort(key=lambda r: r.ts_utc)
+    exp_sorted = sorted(rows, key=lambda r: r.price_pln_per_kwh, reverse=True)[:5]
+    exp_sorted.sort(key=lambda r: r.ts_utc)
+
+    def fmt(r: PstrykPrice) -> tuple[str, float, bool]:
+        local = to_local(r.ts_utc)
+        is_today = local.date() == today_local
+        label = local.strftime("%H:%M") if is_today else "tom " + local.strftime("%H:%M")
+        return (label, r.price_pln_per_kwh, is_today)
 
     return templates.TemplateResponse(
         request,
         "partials/cheapest_hours.html",
         {
-            "cheapest": [(to_local_str(r.ts_utc), r.price_pln_per_kwh) for r in cheapest],
-            "expensive": [(to_local_str(r.ts_utc), r.price_pln_per_kwh) for r in expensive],
+            "cheapest": [fmt(r) for r in cheap_sorted],
+            "expensive": [fmt(r) for r in exp_sorted],
             "have_forecast": len(rows) > 0,
+            "have_tomorrow": any(to_local(r.ts_utc).date() != today_local for r in rows),
         },
     )

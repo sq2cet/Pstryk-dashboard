@@ -19,7 +19,7 @@
   const customLabels = form.querySelectorAll(".custom-only");
 
   let comboChart = null;
-  let cumChart = null;
+  let costChart = null;
   let liveChart = null;
 
   const NUM = (v, digits = 2) =>
@@ -79,10 +79,9 @@
     document.getElementById("t-avg").textContent = NUM(data.totals.avg_price_pln_per_kwh, 4);
     document.getElementById("t-min").textContent = NUM(data.totals.min_price_pln_per_kwh, 4);
     document.getElementById("t-max").textContent = NUM(data.totals.max_price_pln_per_kwh, 4);
-    document.getElementById("t-count").textContent = data.totals.bucket_count;
 
     renderCombo(labels, prices, kwh);
-    renderCumulative(labels, data.cumulative_cost_pln, data.cumulative_kwh);
+    renderCostConsumption(labels, kwh, data.buckets.map((b) => b.cost_pln));
     renderTable(data.buckets, data.resolution);
   }
 
@@ -136,17 +135,26 @@
     });
   }
 
-  function renderCumulative(labels, cumulativeCost, cumulativeKwh) {
-    const canvas = document.getElementById("chart-cumcost");
-    if (cumChart) cumChart.destroy();
-    cumChart = new Chart(canvas, {
+  function renderCostConsumption(labels, kwh, costPln) {
+    const canvas = document.getElementById("chart-cost-consumption");
+    if (costChart) costChart.destroy();
+    costChart = new Chart(canvas, {
       data: {
         labels,
         datasets: [
           {
+            type: "bar",
+            label: "Consumption (kWh)",
+            data: kwh,
+            backgroundColor: "rgba(245, 197, 24, 0.5)",
+            borderColor: "rgba(245, 197, 24, 0.9)",
+            borderWidth: 1,
+            yAxisID: "y_kwh",
+          },
+          {
             type: "line",
-            label: "Cumulative cost (PLN)",
-            data: cumulativeCost,
+            label: "Cost (PLN)",
+            data: costPln,
             borderColor: "#9affb6",
             backgroundColor: "rgba(154, 255, 182, 0.15)",
             fill: true,
@@ -154,18 +162,6 @@
             pointRadius: 0,
             spanGaps: true,
             yAxisID: "y_cost",
-          },
-          {
-            type: "line",
-            label: "Cumulative usage (kWh)",
-            data: cumulativeKwh,
-            borderColor: "#f5c518",
-            backgroundColor: "rgba(245, 197, 24, 0.0)",
-            borderDash: [4, 4],
-            tension: 0.2,
-            pointRadius: 0,
-            spanGaps: true,
-            yAxisID: "y_kwh",
           },
         ],
       },
@@ -233,49 +229,66 @@
   fTo.addEventListener("change", refresh);
 
   // --- Live-power chart -------------------------------------------------
+  // Built once, then updated in place every 5 s. Replacing the data and
+  // calling update("none") makes the chart appear to slide left as new
+  // points arrive at the right and old points drop off the left, instead
+  // of animating from zero on each refresh.
   async function refreshLivePower() {
     const res = await fetch("/api/charts/live-power?minutes=60");
     if (!res.ok) return;
     const data = await res.json();
-    renderLivePower(data);
-  }
 
-  function renderLivePower(data) {
     const labels = data.ts.map((iso) =>
-      new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    );
-    const datasets = [
-      { label: "Total", data: data.total_w, borderColor: "#e6e8eb" },
-      { label: "L1", data: data.l1_w, borderColor: "#7ec8ff" },
-      { label: "L2", data: data.l2_w, borderColor: "#9affb6" },
-      { label: "L3", data: data.l3_w, borderColor: "#f5c518" },
-    ].map((d) => ({
-      ...d,
-      type: "line",
-      borderWidth: 1.5,
-      tension: 0.15,
-      pointRadius: 0,
-      spanGaps: true,
-      backgroundColor: d.borderColor,
-    }));
-
-    const canvas = document.getElementById("chart-live-power");
-    if (!canvas) return;
-    if (liveChart) liveChart.destroy();
-    liveChart = new Chart(canvas, {
-      data: { labels, datasets },
-      options: chartCommon({
-        scales: {
-          y: {
-            type: "linear",
-            position: "left",
-            title: { display: true, text: "W" },
-            grid: { color: "rgba(255,255,255,0.05)" },
-            ticks: { color: "#8a8f98" },
-          },
-        },
+      new Date(iso).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
       }),
-    });
+    );
+
+    if (!liveChart) {
+      const canvas = document.getElementById("chart-live-power");
+      if (!canvas) return;
+      const datasets = [
+        { label: "Total", data: data.total_w, borderColor: "#e6e8eb" },
+        { label: "L1", data: data.l1_w, borderColor: "#7ec8ff" },
+        { label: "L2", data: data.l2_w, borderColor: "#9affb6" },
+        { label: "L3", data: data.l3_w, borderColor: "#f5c518" },
+      ].map((d) => ({
+        ...d,
+        type: "line",
+        borderWidth: 1.5,
+        tension: 0.15,
+        pointRadius: 0,
+        spanGaps: true,
+        backgroundColor: d.borderColor,
+      }));
+      liveChart = new Chart(canvas, {
+        data: { labels, datasets },
+        options: {
+          ...chartCommon({
+            scales: {
+              y: {
+                type: "linear",
+                position: "left",
+                title: { display: true, text: "W" },
+                grid: { color: "rgba(255,255,255,0.05)" },
+                ticks: { color: "#8a8f98" },
+              },
+            },
+          }),
+          animation: false,
+        },
+      });
+      return;
+    }
+
+    liveChart.data.labels = labels;
+    liveChart.data.datasets[0].data = data.total_w;
+    liveChart.data.datasets[1].data = data.l1_w;
+    liveChart.data.datasets[2].data = data.l2_w;
+    liveChart.data.datasets[3].data = data.l3_w;
+    liveChart.update("none");
   }
 
   refresh();
