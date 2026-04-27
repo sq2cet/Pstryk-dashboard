@@ -1,0 +1,12 @@
+{# Visible only while the historical-data download is running. #}
+<div class="banner banner--{% if status == 'failed' %}warn{% else %}ok{% endif %} banner-progress">
+  <div>
+    <strong>{% if status == 'failed' %}⚠ Błąd pobierania{% else %}⏳ Pobieranie danych historycznych{% endif %}</strong>
+    <div class="muted small">{{ message }}</div>
+  </div>
+  {% if status == 'running' %}
+  <div class="muted small">
+    {{ rows }} godzin · {{ chunks }} fragment(y)
+  </div>
+  {% endif %}
+</div>

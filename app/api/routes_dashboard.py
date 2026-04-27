@@ -118,6 +118,29 @@ def live_tile(request: Request, session: SessionDep) -> HTMLResponse:
     return templates.TemplateResponse(request, "partials/live_tile.html", ctx)
 
 
+@router.get("/partials/backfill-status", response_class=HTMLResponse)
+def backfill_status(request: Request) -> HTMLResponse:
+    """Render the historical-data download banner.
+
+    Returns:
+    - empty body when status is idle/complete (HTMX swap collapses it)
+    - a banner with progress when running
+    - an error banner when failed
+    """
+    if state.backfill_status in ("idle", "complete"):
+        return HTMLResponse("")
+    return templates.TemplateResponse(
+        request,
+        "partials/backfill_status.html",
+        {
+            "status": state.backfill_status,
+            "message": state.backfill_message,
+            "chunks": state.backfill_chunks_done,
+            "rows": state.backfill_rows_loaded,
+        },
+    )
+
+
 @router.get("/partials/cheapest-hours", response_class=HTMLResponse)
 def cheapest_hours(request: Request, session: SessionDep) -> HTMLResponse:
     """The cheapest / most-expensive remaining hours of today plus all
@@ -148,10 +171,14 @@ def cheapest_hours(request: Request, session: SessionDep) -> HTMLResponse:
     exp_sorted = sorted(rows, key=lambda r: r.price_pln_per_kwh, reverse=True)[:5]
     exp_sorted.sort(key=lambda r: r.ts_utc)
 
+    # Polish 3-letter weekday abbreviations, indexed by datetime.weekday()
+    # (Monday=0). Hardcoded — avoids pulling in babel for a 7-element map.
+    pl_weekday = ["pn", "wt", "śr", "czw", "pt", "sob", "nd"]
+
     def fmt(r: PstrykPrice) -> tuple[str, str, float, bool]:
         local = to_local(r.ts_utc)
         is_today = local.date() == today_local
-        return (local.strftime("%a"), local.strftime("%H:%M"), r.price_pln_per_kwh, is_today)
+        return (pl_weekday[local.weekday()], local.strftime("%H:%M"), r.price_pln_per_kwh, is_today)
 
     return templates.TemplateResponse(
         request,

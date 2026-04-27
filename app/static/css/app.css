@@ -57,6 +57,12 @@ a { color: var(--accent); }
 }
 .banner--ok   { background: #1b3a26; color: #b8efc4; border: 1px solid #2a5a3c; }
 .banner--warn { background: #3a2f1b; color: #f3d6a0; border: 1px solid #5a4a2a; }
+.banner-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
 
 .form fieldset {
   border: 1px solid var(--border);

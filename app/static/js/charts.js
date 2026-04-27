@@ -22,8 +22,9 @@
   let costChart = null;
   let liveChart = null;
 
+  const LOCALE = "pl-PL";
   const NUM = (v, digits = 2) =>
-    v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    v == null ? "—" : Number(v).toLocaleString(LOCALE, { maximumFractionDigits: digits, minimumFractionDigits: digits });
 
   function showCustomInputs(show) {
     customLabels.forEach((el) => (el.hidden = !show));
@@ -33,13 +34,13 @@
     const d = new Date(iso);
     const opts =
       resolution === "hour"
-        ? { hour: "2-digit", minute: "2-digit" }
+        ? { hour: "2-digit", minute: "2-digit", hour12: false }
         : resolution === "day"
-          ? { month: "short", day: "2-digit" }
+          ? { day: "2-digit", month: "short" }
           : resolution === "month"
             ? { year: "numeric", month: "short" }
             : { year: "numeric" };
-    return d.toLocaleString([], opts);
+    return d.toLocaleString(LOCALE, opts);
   }
 
   // --- Filter-driven charts ---------------------------------------------
@@ -240,10 +241,11 @@
     const data = await res.json();
 
     const labels = data.ts.map((iso) =>
-      new Date(iso).toLocaleTimeString([], {
+      new Date(iso).toLocaleTimeString(LOCALE, {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
+        hour12: false,
       }),
     );
 

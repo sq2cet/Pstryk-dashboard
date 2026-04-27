@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div id="backfill-status"
+     hx-get="/partials/backfill-status"
+     hx-trigger="load, every 5s"
+     hx-swap="innerHTML">
+</div>
+
 <section class="card live-card"
          hx-get="/partials/live"
          hx-trigger="load, every 5s"

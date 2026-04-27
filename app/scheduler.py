@@ -97,6 +97,8 @@ async def pstryk_backfill_all_job() -> None:
     the job idempotent across restarts — chunks that already carry
     both kwh_import and cost_pln are not re-fetched.
     """
+    from app import state
+
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
@@ -106,6 +108,7 @@ async def pstryk_backfill_all_job() -> None:
         if not api_key:
             return
 
+        state.backfill_start()
         now = datetime.now(UTC)
         async with PstrykClient(api_key=api_key) as client:
             # Forecast window — always fetched to refresh forward prices.
@@ -114,6 +117,9 @@ async def pstryk_backfill_all_job() -> None:
                 prices = parse_hourly_prices(payload)
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
+                state.backfill_progress(
+                    f"Pobieranie prognozy ({len(prices)} godzin)...", len(prices)
+                )
                 logger.info("Backfill forecast chunk: %d rows", len(prices))
             except PstrykAPIError as exc:
                 logger.warning("Backfill forecast chunk failed: %s", exc)
@@ -131,6 +137,9 @@ async def pstryk_backfill_all_job() -> None:
                         window_start.date(),
                         window_end.date(),
                     )
+                    state.backfill_progress(
+                        f"Sprawdzanie {window_start.date()} (już pobrane)...", 0
+                    )
                     consecutive_empty = 0
                     continue
                 try:
@@ -142,6 +151,10 @@ async def pstryk_backfill_all_job() -> None:
                 rows_with_kwh = sum(1 for p in prices if p.kwh_import is not None)
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
+                state.backfill_progress(
+                    f"Pobieranie {window_start.date()} → {window_end.date()} ({len(prices)} godzin)...",
+                    len(prices),
+                )
                 logger.info(
                     "Backfill %s..%s: %d rows (%d with kwh)",
                     window_start.date(),
@@ -159,8 +172,14 @@ async def pstryk_backfill_all_job() -> None:
                         break
                 else:
                     consecutive_empty = 0
-    except Exception:
+
+        state.backfill_done(
+            f"Zakończono. Pobrano {state.backfill_rows_loaded} godzin "
+            f"w {state.backfill_chunks_done} fragmentach."
+        )
+    except Exception as exc:
         logger.exception("Pstryk backfill crashed")
+        state.backfill_failed(f"Błąd pobierania: {exc}")
 
 
 def _chunk_has_full_kwh(window_start: datetime, window_end: datetime) -> bool:
