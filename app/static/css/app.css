@@ -42,3 +42,49 @@ main { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 
 a { color: var(--accent); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+.banner--ok   { background: #1b3a26; color: #b8efc4; border: 1px solid #2a5a3c; }
+.banner--warn { background: #3a2f1b; color: #f3d6a0; border: 1px solid #5a4a2a; }
+
+.form fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.form legend { color: var(--accent); padding: 0 0.4rem; font-weight: 600; }
+.form label { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.5rem 0; }
+.form label > span { color: var(--muted); font-size: 0.85rem; }
+.form input {
+  background: #0a0c12;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+}
+.form small { color: var(--muted); font-size: 0.78rem; }
+
+.actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+.actions button {
+  background: var(--accent);
+  color: #1a1a1a;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.actions button:hover { filter: brightness(1.05); }

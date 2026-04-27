@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h1>Settings</h1>
+
+  {% if saved %}
+  <div class="banner banner--ok">Settings saved.</div>
+  {% endif %}
+
+  {% if not view.is_configured() %}
+  <div class="banner banner--warn">
+    Configuration incomplete. Set the Pstryk API key and BleBox host to start collecting data.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/settings" class="form">
+    <fieldset>
+      <legend>Pstryk</legend>
+      <label>
+        <span>API key</span>
+        <input type="password"
+               name="pstryk_api_key"
+               autocomplete="off"
+               placeholder="{% if view.pstryk_api_key_set %}•••••••••• (set, leave blank to keep){% else %}paste your Pstryk API key{% endif %}" />
+      </label>
+      <label>
+        <span>Poll interval (minutes)</span>
+        <input type="number" min="15" max="1440" name="pstryk_poll_minutes" value="{{ view.pstryk_poll_minutes }}" />
+        <small>API hard limit is 3 requests/hour per endpoint. 60 is safe.</small>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>BleBox energy meter</legend>
+      <label>
+        <span>Host or IP</span>
+        <input type="text" name="blebox_host" value="{{ view.blebox_host or '' }}" placeholder="192.168.1.50" />
+      </label>
+      <label>
+        <span>Port</span>
+        <input type="number" min="1" max="65535" name="blebox_port" value="{{ view.blebox_port }}" />
+      </label>
+      <label>
+        <span>Live tile refresh (seconds)</span>
+        <input type="number" min="1" max="60" name="blebox_live_seconds" value="{{ view.blebox_live_seconds }}" />
+      </label>
+      <label>
+        <span>Persist interval (seconds)</span>
+        <input type="number" min="10" max="600" name="blebox_persist_seconds" value="{{ view.blebox_persist_seconds }}" />
+        <small>How often a reading is written to the database.</small>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Display</legend>
+      <label>
+        <span>Timezone</span>
+        <input type="text" name="tz" value="{{ view.tz }}" />
+      </label>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit">Save</button>
+      <a href="/">Back to dashboard</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
