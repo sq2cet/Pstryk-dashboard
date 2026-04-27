@@ -6,8 +6,15 @@ The flow is:
 1. Probe `/api/device/state` to learn the device `type`.
 2. Dispatch to the appropriate state endpoint:
    - `switchBox`, `switchBoxD` → `/api/relay/extended/state`
-   - `multiSensor` → `/api/multiSensor/state`
+   - `multiSensor` → `/state`
 3. Parse active power (W) and cumulative energy (kWh) from the response.
+
+The BleBox MultiSensor (e.g. the Pstryk-branded `PstrykEnergyMeter`)
+reports a 3-phase reading as four sensor groups:
+  `id=0` = household totals, `id=1/2/3` = phases L1/L2/L3.
+The dashboard cares about the totals only, so the parser keeps `id=0`
+and ignores per-phase rows. `forwardActiveEnergy` is reported in Wh and
+divided by 1000 to convert to the kWh the rest of the app uses.
 
 Devices on the LAN do not require authentication.
 """
@@ -103,7 +110,7 @@ class BleBoxClient:
             payload = await self._get("/api/relay/extended/state")
             return parse_relay_state(payload)
         if device.type in _MULTISENSOR_TYPES:
-            payload = await self._get("/api/multiSensor/state")
+            payload = await self._get("/state")
             return parse_multisensor_state(payload)
         raise UnsupportedBleBoxDevice(
             f"BleBox device type {device.type!r} is not supported by the energy parser"
@@ -141,18 +148,26 @@ def parse_relay_state(payload: dict) -> BleBoxReading:
 
 
 def parse_multisensor_state(payload: dict) -> BleBoxReading:
-    """MultiSensor parser.
+    """MultiSensor parser for the Pstryk-branded `PstrykEnergyMeter`.
 
-    The MultiSensor reports a heterogeneous list under `multiSensor.sensors`;
-    each entry has a `type` (`activePower`, `energy`, `voltage`, ...) and a
-    `value`. Schema details vary by `apiLevel`; this parser is intentionally
-    forgiving.
+    Sensors come in groups identified by `id`: `id=0` is the household
+    aggregate, `id=1/2/3` are per-phase L1/L2/L3. We keep `id=0`.
+
+    Units:
+    - `activePower` is reported in whole Watts.
+    - `forwardActiveEnergy` is reported in Wh and converted to kWh here.
     """
-    sensors = (payload.get("multiSensor") or {}).get("sensors") or payload.get("sensors") or []
+    all_sensors = (payload.get("multiSensor") or {}).get("sensors") or payload.get("sensors") or []
+    aggregate = [s for s in all_sensors if isinstance(s, dict) and s.get("id") == 0]
+
+    active_power_w = _find_sensor(aggregate, "activePower")
+    forward_active_energy_wh = _find_sensor(aggregate, "forwardActiveEnergy")
+    energy_kwh = forward_active_energy_wh / 1000.0 if forward_active_energy_wh is not None else None
+
     return BleBoxReading(
         ts_utc=_now_utc(),
-        active_power_w=_find_sensor(sensors, "activePower"),
-        energy_kwh_total=_find_sensor(sensors, "energy", "energyTotal", "totalEnergy"),
+        active_power_w=active_power_w,
+        energy_kwh_total=energy_kwh,
         raw=payload,
     )
 

@@ -1,11 +1,14 @@
 {
   "device_state": {
     "device": {
-      "deviceName": "kitchen-meter",
-      "type": "switchBoxD",
-      "product": "switchBoxD",
-      "apiLevel": "20200831",
-      "id": "abc123"
+      "deviceName": "Pstryk",
+      "type": "multiSensor",
+      "product": "PstrykEnergyMeter",
+      "hv": "sMbB-1.0",
+      "fv": "0.1150",
+      "apiLevel": "20241124",
+      "id": "f024f9957f20",
+      "ip": "10.0.0.184"
     }
   },
   "relay_extended_state": {
@@ -26,10 +29,27 @@
   },
   "multisensor_state": {
     "multiSensor": {
+      "periodicCounter": {"enabled": 0, "resetType": 3},
+      "energyMeter": {"measureReverseEnergy": {"enabled": 1}},
       "sensors": [
-        {"type": "activePower", "value": 1234.5},
-        {"type": "energy", "value": 87.65},
-        {"type": "voltage", "value": 230.1}
+        {"id": 0, "type": "forwardActiveEnergy", "value": 109443, "state": 2},
+        {"id": 0, "type": "reverseActiveEnergy", "value": 0, "state": 2},
+        {"id": 0, "type": "apparentEnergy", "value": 153609, "state": 2},
+        {"id": 0, "type": "activePower", "value": 520, "state": 2},
+        {"id": 0, "type": "reactivePower", "value": -528, "state": 2},
+        {"id": 0, "type": "apparentPower", "value": 933, "state": 2},
+        {"id": 0, "type": "voltage", "value": 2450, "state": 2},
+        {"id": 0, "type": "current", "value": 1591, "state": 2},
+        {"id": 0, "type": "frequency", "value": 50060, "state": 2},
+
+        {"id": 1, "type": "forwardActiveEnergy", "value": 31934, "state": 2},
+        {"id": 1, "type": "activePower", "value": 151, "state": 2},
+
+        {"id": 2, "type": "forwardActiveEnergy", "value": 44488, "state": 2},
+        {"id": 2, "type": "activePower", "value": 267, "state": 2},
+
+        {"id": 3, "type": "forwardActiveEnergy", "value": 33022, "state": 2},
+        {"id": 3, "type": "activePower", "value": 102, "state": 2}
       ]
     }
   }

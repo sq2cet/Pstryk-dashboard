@@ -85,12 +85,17 @@ async def pstryk_backfill_30d_job() -> None:
             return
 
         now = datetime.now(UTC)
+        # Seed both 30 days of history and the next 24h of forecast so the
+        # dashboard has forecast prices on first run, not only after the
+        # 60-min poll job catches up. Chunk size keeps per-call response
+        # sizes reasonable; per-endpoint rate-limit is 3 req/hour.
+        windows = [(now, now + timedelta(days=1))]
+        for chunk_end_offset in range(0, 30, 7):
+            end = now - timedelta(days=chunk_end_offset)
+            windows.append((end - timedelta(days=7), end))
+
         async with PstrykClient(api_key=api_key) as client:
-            # Fetch in 7-day chunks to keep per-call response sizes reasonable
-            # while staying within the 3-req/hour rate limit on this endpoint.
-            for chunk_end_offset in range(0, 30, 7):
-                window_end = now - timedelta(days=chunk_end_offset)
-                window_start = window_end - timedelta(days=7)
+            for window_start, window_end in windows:
                 try:
                     payload = await client.fetch_unified_metrics(window_start, window_end)
                 except PstrykAPIError as exc:

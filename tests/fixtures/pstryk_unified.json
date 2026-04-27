@@ -1,9 +1,54 @@
 {
-  "prices": [
-    {"start": "2026-04-27T00:00:00Z", "price_gross": 0.42, "is_forecast": false},
-    {"start": "2026-04-27T01:00:00Z", "price_gross": 0.41, "is_forecast": false},
-    {"start": "2026-04-27T02:00:00Z", "price_gross": 0.40, "is_forecast": false},
-    {"start": "2099-04-27T00:00:00Z", "price_gross": 0.55, "is_forecast": true}
+  "frames": [
+    {
+      "start": "2026-04-26T22:00:00Z",
+      "end": "2026-04-26T23:00:00Z",
+      "metrics": {
+        "pricing": {
+          "tge_price": 0.254,
+          "dist_price": 0.0951,
+          "service_price": 0.08,
+          "base_price": 0.4291,
+          "vat_component": 0.0987,
+          "excise_component": 0.005,
+          "full_price": 0.5328,
+          "price_net": 0.254,
+          "price_gross": 0.5328,
+          "price_prosumer_net": 0.254,
+          "price_prosumer_gross": 0.31242,
+          "is_cheap": true,
+          "is_expensive": false
+        }
+      }
+    },
+    {
+      "start": "2026-04-26T23:00:00Z",
+      "end": "2026-04-27T00:00:00Z",
+      "metrics": {
+        "pricing": {
+          "price_gross": 0.6010,
+          "is_cheap": false,
+          "is_expensive": false
+        }
+      }
+    },
+    {
+      "start": "2099-01-01T00:00:00Z",
+      "end": "2099-01-01T01:00:00Z",
+      "metrics": {
+        "pricing": {
+          "price_gross": 0.7500,
+          "is_cheap": false,
+          "is_expensive": true
+        }
+      }
+    }
   ],
-  "balance_pln": 12.34
+  "summary": {
+    "pricing": {
+      "min_price_gross": 0.5328,
+      "max_price_gross": 0.7500,
+      "avg_price_gross": 0.6279
+    }
+  }
 }

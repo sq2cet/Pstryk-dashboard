@@ -1,10 +1,14 @@
 """Async client for the Pstryk integrations API.
 
-The exact response schema of `/integrations/unified-metrics/` is not in
-the public docs (Swagger requires login). The parser below handles the
-common shapes seen in community Home Assistant integrations and falls
-back gracefully when fields are renamed. Once a real key produces a
-sample response, tighten the parser to match.
+Matches the OpenAPI spec at https://api.pstryk.pl/integrations/schema/.
+The single endpoint we use is
+`/integrations/meter-data/unified-metrics/` (the spec calls older
+single-metric endpoints "deprecated" and routes them through this one).
+
+Auth: the Pstryk API key is sent as `Authorization: <key>` directly,
+without a `Bearer` or `Token` scheme prefix. This is the
+TokenAuthentication scheme declared in the spec and the format shown in
+the spec's request example (`Authorization: sk-your-token-here`).
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://api.pstryk.pl"
+UNIFIED_METRICS_PATH = "/integrations/meter-data/unified-metrics/"
 DEFAULT_TIMEOUT = 20.0
 MAX_RETRIES_ON_429 = 4
 
@@ -55,7 +60,7 @@ class PstrykClient:
             base_url=base_url,
             timeout=timeout,
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": api_key,
                 "Accept": "application/json",
             },
         )
@@ -74,14 +79,21 @@ class PstrykClient:
         window_start: datetime,
         window_end: datetime,
         resolution: str = "hour",
+        metrics: str = "pricing",
     ) -> dict:
-        """Fetch /integrations/unified-metrics/ for the given UTC window."""
+        """Fetch the unified-metrics endpoint for the given UTC window.
+
+        `metrics` is a comma-separated subset of
+        {`meter_values`, `cost`, `carbon`, `pricing`}. Defaults to
+        `pricing` which is what the dashboard's tariff backfill needs.
+        """
         params = {
+            "metrics": metrics,
+            "resolution": resolution,
             "window_start": _isoformat_utc(window_start),
             "window_end": _isoformat_utc(window_end),
-            "resolution": resolution,
         }
-        return await self._get_json("/integrations/unified-metrics/", params)
+        return await self._get_json(UNIFIED_METRICS_PATH, params)
 
     async def _get_json(self, path: str, params: dict) -> dict:
         backoff = 2.0
@@ -110,28 +122,38 @@ class PstrykClient:
 
 
 def parse_hourly_prices(payload: dict) -> list[HourlyPrice]:
-    """Tolerant parser for the unified-metrics payload.
+    """Parse the gross PLN/kWh price out of `frames[].metrics.pricing`.
 
-    Looks for an iterable of hourly entries under any of the keys we've
-    seen across community implementations (`prices`, `frames`, `entries`,
-    `data`). Each entry is expected to expose a timestamp and a
-    PLN/kWh price under one of several common names.
+    The Pstryk API returns hourly frames with a nested `pricing` object
+    containing `price_gross` (the consumer-facing price including
+    distribution + service + VAT + excise). Frames whose `start` is in
+    the future are tagged `forecast`; everything else is `historical`.
+    Frames carrying `is_live: true` are the current hour and are also
+    treated as historical (the price for the current hour is fixed).
     """
-    rows = (
-        payload.get("prices")
-        or payload.get("frames")
-        or payload.get("entries")
-        or payload.get("data")
-        or []
-    )
+    frames = payload.get("frames") or []
     parsed: list[HourlyPrice] = []
-    for row in rows:
-        ts = _parse_ts(row)
-        price = _parse_price(row)
-        if ts is None or price is None:
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for frame in frames:
+        start = frame.get("start")
+        if not isinstance(start, str):
             continue
-        kind = "forecast" if _is_forecast(row, ts) else "historical"
-        parsed.append(HourlyPrice(ts_utc=ts, price_pln_per_kwh=price, kind=kind))
+        try:
+            ts = (
+                datetime.fromisoformat(start.replace("Z", "+00:00"))
+                .astimezone(UTC)
+                .replace(tzinfo=None)
+            )
+        except ValueError:
+            continue
+        pricing = (frame.get("metrics") or {}).get("pricing") or {}
+        price = pricing.get("price_gross")
+        if price is None:
+            price = pricing.get("full_price")
+        if not isinstance(price, (int, float)):
+            continue
+        kind = "forecast" if (ts > now and not frame.get("is_live")) else "historical"
+        parsed.append(HourlyPrice(ts_utc=ts, price_pln_per_kwh=float(price), kind=kind))
     parsed.sort(key=lambda p: p.ts_utc)
     return parsed
 
@@ -140,31 +162,3 @@ def _isoformat_utc(dt: datetime) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _parse_ts(row: dict) -> datetime | None:
-    for key in ("timestamp", "start", "time", "ts", "from", "datetime"):
-        raw = row.get(key)
-        if isinstance(raw, str):
-            try:
-                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-                return dt.astimezone(UTC).replace(tzinfo=None)
-            except ValueError:
-                continue
-    return None
-
-
-def _parse_price(row: dict) -> float | None:
-    for key in ("price_gross", "gross_price", "price", "value", "pln_per_kwh"):
-        raw = row.get(key)
-        if isinstance(raw, (int, float)):
-            return float(raw)
-    return None
-
-
-def _is_forecast(row: dict, ts: datetime) -> bool:
-    if "is_forecast" in row:
-        return bool(row["is_forecast"])
-    if isinstance(row.get("kind"), str):
-        return row["kind"].lower() in {"forecast", "future"}
-    return ts > datetime.now(UTC).replace(tzinfo=None)
