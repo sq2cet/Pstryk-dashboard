@@ -1,0 +1,35 @@
+{# Live tile fragment — refreshed by HTMX every 5s. #}
+<div class="live-grid">
+  <div class="live-cell">
+    <div class="live-label">Now</div>
+    <div class="live-value">
+      {% if active_power_w is not none %}
+        ⚡ {{ "%.0f"|format(active_power_w) }} <small>W</small>
+      {% else %}
+        <span class="muted">no reading yet</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="live-cell">
+    <div class="live-label">Price</div>
+    <div class="live-value">
+      {% if current_price_pln_per_kwh is not none %}
+        {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
+      {% else %}
+        <span class="muted">—</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="live-cell">
+    <div class="live-label">Today</div>
+    <div class="live-value">
+      {{ "%.2f"|format(today_kwh) }} <small>kWh</small>
+    </div>
+  </div>
+  <div class="live-cell">
+    <div class="live-label">Today's cost</div>
+    <div class="live-value">
+      {{ "%.2f"|format(today_cost_pln) }} <small>PLN</small>
+    </div>
+  </div>
+</div>

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
-from app.api import routes_settings
+from app.api import routes_charts, routes_dashboard, routes_settings
 from app.db import get_session, init_db
 from app.scheduler import build_scheduler, is_disabled
 from app.services import settings_service as svc
@@ -43,6 +43,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Pstryk Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.include_router(routes_settings.router)
+app.include_router(routes_dashboard.router)
+app.include_router(routes_charts.router)
 
 
 @app.get("/healthz")

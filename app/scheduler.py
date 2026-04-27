@@ -114,8 +114,14 @@ async def pstryk_backfill_30d_job() -> None:
         logger.exception("Pstryk backfill crashed")
 
 
-async def blebox_persist_job() -> None:
-    """Read the BleBox state and persist a single MeterReading row."""
+async def blebox_live_job() -> None:
+    """Poll BleBox and refresh the in-memory live cache.
+
+    Runs every `blebox_live_seconds` (default 5 s). The 60 s persist
+    job reads the cached reading rather than re-hitting the device.
+    """
+    from app import state
+
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
@@ -126,11 +132,23 @@ async def blebox_persist_job() -> None:
 
         async with BleBoxClient(host=host, port=port) as client:
             reading = await client.read_state()
+        state.set_last_reading(reading)
+    except BleBoxError as exc:
+        logger.warning("BleBox live job error: %s", exc)
+    except Exception:
+        logger.exception("BleBox live job crashed")
 
+
+def blebox_persist_job() -> None:
+    """Persist the most recent cached BleBox reading to MeterReading."""
+    from app import state
+
+    try:
+        reading = state.last_reading
+        if reading is None:
+            return
         with Session(engine) as session:
             record_meter_reading(session, reading)
-    except BleBoxError as exc:
-        logger.warning("BleBox persist error: %s", exc)
     except Exception:
         logger.exception("BleBox persist job crashed")
 
@@ -164,6 +182,13 @@ def build_scheduler() -> AsyncIOScheduler:
         pstryk_poll_job,
         IntervalTrigger(minutes=view.pstryk_poll_minutes),
         id="pstryk_poll",
+        max_instances=1,
+        coalesce=True,
+    )
+    sched.add_job(
+        blebox_live_job,
+        IntervalTrigger(seconds=view.blebox_live_seconds),
+        id="blebox_live",
         max_instances=1,
         coalesce=True,
     )

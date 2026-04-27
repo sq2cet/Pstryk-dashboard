@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="placeholder">
-  <h1>Dashboard scaffold</h1>
-  <p>
-    The application is wired up but the live data sources are not connected yet.
-    Enter your Pstryk API key and BleBox IP at <a href="/settings">/settings</a> to begin.
-  </p>
-  <p class="muted">Next milestones: Pstryk client, BleBox client, scheduler, charts.</p>
+<section class="card live-card"
+         hx-get="/partials/live"
+         hx-trigger="load, every 5s"
+         hx-swap="innerHTML">
+  <div class="muted">loading live reading…</div>
 </section>
+
+<section class="card chart-card">
+  <header class="chart-header">
+    <h2>Last 24 h price &amp; consumption</h2>
+    <span class="muted small">forecast next 24 h on the right</span>
+  </header>
+  <div class="chart-wrap">
+    <canvas id="chart-hourly" aria-label="Hourly price and consumption"></canvas>
+  </div>
+</section>
+
+<script src="{{ url_for('static', path='js/charts.js') }}" defer></script>
 {% endblock %}
