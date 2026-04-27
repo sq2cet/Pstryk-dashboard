@@ -15,6 +15,14 @@ from app.db import get_session, init_db
 from app.scheduler import build_scheduler, is_disabled
 from app.services import settings_service as svc
 
+# Configure the root logger so that our app module loggers
+# (`app.scheduler`, `app.api.*`, etc.) actually emit at INFO level
+# inside the Docker container. The default root level is WARNING
+# which suppressed all our scheduler / job logs in production.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 APP_DIR = Path(__file__).resolve().parent

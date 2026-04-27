@@ -11,6 +11,7 @@ scheduler. Each job opens its own DB session.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import UTC, datetime, timedelta
@@ -115,6 +116,11 @@ async def pstryk_poll_job() -> None:
 BACKFILL_MAX_YEARS = 5
 BACKFILL_CHUNK_DAYS = 7
 BACKFILL_STOP_AFTER_EMPTY_CHUNKS = 2
+BACKFILL_INTER_CHUNK_DELAY_S = 3
+# Each chunk window covers BACKFILL_CHUNK_DAYS × 24 hours; require the
+# DB to hold at least this fraction of those hours before considering
+# the chunk hydrated. Catches misaligned-window leftovers.
+BACKFILL_HYDRATED_THRESHOLD = 0.95
 
 
 async def pstryk_backfill_all_job() -> None:
@@ -140,6 +146,12 @@ async def pstryk_backfill_all_job() -> None:
 
         state.backfill_start()
         now = datetime.now(UTC)
+        # Day-align the chunk anchor to UTC midnight so every backfill
+        # run walks the same windows; without this, a noon-run vs an
+        # evening-run produce shifted windows that overlap each other,
+        # leaving the DB with sparse coverage that the skip-logic
+        # mistakes for "fully hydrated".
+        end_anchor = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         async with PstrykClient(api_key=api_key) as client:
             # Forecast window — always fetched to refresh forward prices.
             try:
@@ -154,12 +166,14 @@ async def pstryk_backfill_all_job() -> None:
             except PstrykAPIError as exc:
                 logger.warning("Backfill forecast chunk failed: %s", exc)
 
-            # History walk back from now. Stop after a couple of
-            # consecutive empty chunks (meter has no data that far back).
+            # History walk back from the day-aligned anchor. Stop after
+            # a couple of consecutive empty chunks (meter has no data
+            # that far back).
             consecutive_empty = 0
+            chunks_fetched = 0
             max_chunks = (BACKFILL_MAX_YEARS * 366) // BACKFILL_CHUNK_DAYS + 1
             for i in range(max_chunks):
-                window_end = now - timedelta(days=i * BACKFILL_CHUNK_DAYS)
+                window_end = end_anchor - timedelta(days=i * BACKFILL_CHUNK_DAYS)
                 window_start = window_end - timedelta(days=BACKFILL_CHUNK_DAYS)
                 if _chunk_has_full_kwh(window_start, window_end):
                     logger.info(
@@ -172,11 +186,21 @@ async def pstryk_backfill_all_job() -> None:
                     )
                     consecutive_empty = 0
                     continue
+                # Defensive sleep between successful fetches to stay
+                # under whatever Pstryk's actual rate limit is.
+                if chunks_fetched > 0:
+                    await asyncio.sleep(BACKFILL_INTER_CHUNK_DELAY_S)
                 try:
                     payload = await client.fetch_unified_metrics(window_start, window_end)
                 except PstrykAPIError as exc:
-                    logger.warning("Backfill chunk failed: %s", exc)
+                    logger.warning(
+                        "Backfill chunk %s..%s failed: %s",
+                        window_start.date(),
+                        window_end.date(),
+                        exc,
+                    )
                     continue
+                chunks_fetched += 1
                 prices = parse_hourly_prices(payload)
                 rows_with_kwh = sum(1 for p in prices if p.kwh_import is not None)
                 with Session(engine) as session:
@@ -213,13 +237,37 @@ async def pstryk_backfill_all_job() -> None:
 
 
 def _chunk_has_full_kwh(window_start: datetime, window_end: datetime) -> bool:
-    """True if every historical row in the window already has both
-    kwh_import AND cost_pln populated (Pstryk's authoritative meter +
-    cost values). A NULL in either signals the chunk needs re-fetch.
+    """True if the window appears fully hydrated.
+
+    Three conditions must all hold:
+    1. The number of rows in the window is at least
+       BACKFILL_HYDRATED_THRESHOLD (95 %) of the expected hour count.
+    2. No row in the window has NULL kwh_import or cost_pln.
+    3. The chunk has at least one row (i.e. it isn't completely empty,
+       which would mean we never fetched it).
+
+    The row-count check guards against an earlier non-day-aligned
+    backfill leaving sparse coverage that the second condition alone
+    would mistake for "hydrated".
     """
+    from sqlalchemy import func
+
     start = window_start.replace(tzinfo=None) if window_start.tzinfo else window_start
     end = window_end.replace(tzinfo=None) if window_end.tzinfo else window_end
+    expected_hours = max(1, int((end - start).total_seconds() / 3600))
     with Session(engine) as session:
+        row_count = session.exec(
+            select(func.count())  # type: ignore[arg-type]
+            .select_from(PstrykPrice)
+            .where(PstrykPrice.ts_utc >= start)
+            .where(PstrykPrice.ts_utc < end)
+        ).one()
+        if isinstance(row_count, tuple):
+            row_count = row_count[0]
+        if row_count == 0:
+            return False
+        if row_count < expected_hours * BACKFILL_HYDRATED_THRESHOLD:
+            return False
         missing = session.exec(
             select(PstrykPrice)
             .where(PstrykPrice.ts_utc >= start)
@@ -230,15 +278,7 @@ def _chunk_has_full_kwh(window_start: datetime, window_end: datetime) -> bool:
             )
             .limit(1)
         ).first()
-        if missing is not None:
-            return False
-        has_any = session.exec(
-            select(PstrykPrice)
-            .where(PstrykPrice.ts_utc >= start)
-            .where(PstrykPrice.ts_utc < end)
-            .limit(1)
-        ).first()
-        return has_any is not None
+        return missing is None
 
 
 async def blebox_live_job() -> None:
