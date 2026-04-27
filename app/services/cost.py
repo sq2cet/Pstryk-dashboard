@@ -33,6 +33,13 @@ class DailyTotals:
     avg_price_pln_per_kwh: float
 
 
+@dataclass(frozen=True)
+class RangeTotals:
+    kwh: float
+    cost_pln: float
+    avg_price_pln_per_kwh: float
+
+
 def kwh_between(prev: MeterReading, curr: MeterReading) -> float | None:
     """Energy used between two consecutive readings, in kWh. None if undecidable."""
     if curr.ts_utc <= prev.ts_utc:
@@ -77,6 +84,33 @@ def compute_day(session: Session, day: date, tz_name: str = "Europe/Warsaw") -> 
 
     avg_price = (total_cost / total_kwh) if total_kwh > 0 else 0.0
     return DailyTotals(day=day, kwh=total_kwh, cost_pln=total_cost, avg_price_pln_per_kwh=avg_price)
+
+
+def compute_range(session: Session, start_utc: datetime, end_utc: datetime) -> RangeTotals:
+    """Sum consumption + cost across an arbitrary UTC range.
+
+    Used for "this month" / "this year" tiles where bucketing per day
+    would be wasteful — the running total is what matters.
+    """
+    readings = readings_in_range(session, start_utc, end_utc)
+    if len(readings) < 2:
+        return RangeTotals(kwh=0.0, cost_pln=0.0, avg_price_pln_per_kwh=0.0)
+
+    total_kwh = 0.0
+    total_cost = 0.0
+    for prev, curr in zip(readings, readings[1:], strict=False):
+        kwh = kwh_between(prev, curr)
+        if kwh is None or kwh <= 0:
+            continue
+        midpoint = prev.ts_utc + (curr.ts_utc - prev.ts_utc) / 2
+        price = latest_price_at(session, midpoint)
+        if price is None:
+            continue
+        total_kwh += kwh
+        total_cost += kwh * price.price_pln_per_kwh
+
+    avg_price = (total_cost / total_kwh) if total_kwh > 0 else 0.0
+    return RangeTotals(kwh=total_kwh, cost_pln=total_cost, avg_price_pln_per_kwh=avg_price)
 
 
 def materialise_day(session: Session, day: date, tz_name: str = "Europe/Warsaw") -> DailyAggregate:

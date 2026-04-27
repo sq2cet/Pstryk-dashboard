@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from app.db import get_session
 from app.models import utcnow_naive
 from app.services import settings_service as svc
+from app.services.aggregations import aggregate_range, resolve_window
 from app.services.timeseries import (
     hour_buckets,
     hourly_consumption_kwh,
@@ -68,4 +70,45 @@ def hourly_chart(
         "history_hours": hours,
         "forecast_hours": forecast_hours,
         "series": series,
+    }
+
+
+@router.get("/api/charts/range")
+def range_chart(
+    session: SessionDep,
+    range_: Annotated[str, Query(alias="range")] = "today",
+    resolution: Annotated[str | None, Query()] = None,
+    from_: Annotated[str | None, Query(alias="from")] = None,
+    to_: Annotated[str | None, Query(alias="to")] = None,
+) -> dict:
+    """Aggregate metrics over a range at a chosen resolution.
+
+    `range` is one of {24h, today, week, month, year, custom}.
+    `resolution` is one of {hour, day, month, year}; defaults to a
+    sensible value for the chosen range.
+    `from`/`to` are required when `range=custom` and are ISO local
+    dates (YYYY-MM-DD).
+    """
+    view = svc.get_view(session)
+    tz = ZoneInfo(view.tz)
+    try:
+        start_utc, end_utc, default_resolution = resolve_window(range_, tz, from_, to_)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    res = resolution or default_resolution
+    if res not in {"hour", "day", "month", "year"}:
+        raise HTTPException(status_code=400, detail=f"unknown resolution: {res}")
+
+    buckets, totals, cumulative = aggregate_range(session, start_utc, end_utc, res, view.tz)
+
+    return {
+        "tz": view.tz,
+        "range": range_,
+        "resolution": res,
+        "start_utc": start_utc.isoformat() + "Z",
+        "end_utc": end_utc.isoformat() + "Z",
+        "buckets": [asdict(b) | {"bucket_utc": b.bucket_utc.isoformat() + "Z"} for b in buckets],
+        "totals": totals,
+        "cumulative_cost_pln": cumulative,
     }

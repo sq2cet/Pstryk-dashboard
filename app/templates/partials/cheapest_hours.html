@@ -1,0 +1,32 @@
+{# Cheapest / most-expensive hours in the next 24 h forecast. #}
+{% if not have_forecast %}
+  <div class="muted">
+    No forecast prices yet — they appear after the next Pstryk poll
+    (within 60 minutes of startup).
+  </div>
+{% else %}
+  <div class="forecast-grid">
+    <div>
+      <div class="forecast-label muted small">Cheapest 5 next 24 h</div>
+      <ul class="forecast-list forecast-cheap">
+        {% for label, price in cheapest %}
+          <li>
+            <span>{{ label }}</span>
+            <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <div class="forecast-label muted small">Most expensive 3 next 24 h</div>
+      <ul class="forecast-list forecast-exp">
+        {% for label, price in expensive %}
+          <li>
+            <span>{{ label }}</span>
+            <span class="forecast-price">{{ "%.4f"|format(price) }} <small>PLN/kWh</small></span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endif %}

@@ -50,11 +50,37 @@ class BleBoxDevice:
 
 
 @dataclass(frozen=True)
+class PhaseReading:
+    active_power_w: float | None = None
+    voltage_v: float | None = None
+    current_a: float | None = None
+
+
+@dataclass(frozen=True)
 class BleBoxReading:
     ts_utc: datetime
     active_power_w: float | None
     energy_kwh_total: float | None
     raw: dict
+    reverse_energy_kwh_total: float | None = None
+    apparent_power_va: float | None = None
+    reactive_power_var: float | None = None
+    voltage_v: float | None = None
+    frequency_hz: float | None = None
+    phase_l1: PhaseReading | None = None
+    phase_l2: PhaseReading | None = None
+    phase_l3: PhaseReading | None = None
+
+    @property
+    def power_factor(self) -> float | None:
+        """|active_power| / apparent_power, in [0, 1]. None if either missing."""
+        if (
+            self.active_power_w is None
+            or self.apparent_power_va is None
+            or self.apparent_power_va == 0
+        ):
+            return None
+        return min(abs(self.active_power_w) / self.apparent_power_va, 1.0)
 
 
 _RELAY_TYPES = {"switchBox", "switchBoxD"}
@@ -151,23 +177,51 @@ def parse_multisensor_state(payload: dict) -> BleBoxReading:
     """MultiSensor parser for the Pstryk-branded `PstrykEnergyMeter`.
 
     Sensors come in groups identified by `id`: `id=0` is the household
-    aggregate, `id=1/2/3` are per-phase L1/L2/L3. We keep `id=0`.
+    aggregate, `id=1/2/3` are per-phase L1/L2/L3.
 
-    Units:
-    - `activePower` is reported in whole Watts.
-    - `forwardActiveEnergy` is reported in Wh and converted to kWh here.
+    Unit conventions (verified against a real device, apiLevel 20241124):
+    - `activePower`, `apparentPower`, `reactivePower` — whole W / VA / var
+    - `forwardActiveEnergy`, `reverseActiveEnergy` — Wh (divided to kWh)
+    - `voltage` — decivolts (divided by 10)
+    - `current` — milliamps (divided by 1000)
+    - `frequency` — millihertz (divided by 1000)
     """
     all_sensors = (payload.get("multiSensor") or {}).get("sensors") or payload.get("sensors") or []
-    aggregate = [s for s in all_sensors if isinstance(s, dict) and s.get("id") == 0]
+    by_id: dict[int, list[dict]] = {}
+    for s in all_sensors:
+        if isinstance(s, dict) and isinstance(s.get("id"), int):
+            by_id.setdefault(s["id"], []).append(s)
 
-    active_power_w = _find_sensor(aggregate, "activePower")
-    forward_active_energy_wh = _find_sensor(aggregate, "forwardActiveEnergy")
-    energy_kwh = forward_active_energy_wh / 1000.0 if forward_active_energy_wh is not None else None
+    aggregate = by_id.get(0, [])
+    forward_wh = _find_sensor(aggregate, "forwardActiveEnergy")
+    reverse_wh = _find_sensor(aggregate, "reverseActiveEnergy")
+    voltage_dv = _find_sensor(aggregate, "voltage")
+    freq_mhz = _find_sensor(aggregate, "frequency")
+
+    def _phase(sid: int) -> PhaseReading | None:
+        sensors = by_id.get(sid)
+        if not sensors:
+            return None
+        v_dv = _find_sensor(sensors, "voltage")
+        c_ma = _find_sensor(sensors, "current")
+        return PhaseReading(
+            active_power_w=_find_sensor(sensors, "activePower"),
+            voltage_v=(v_dv / 10.0) if v_dv is not None else None,
+            current_a=(c_ma / 1000.0) if c_ma is not None else None,
+        )
 
     return BleBoxReading(
         ts_utc=_now_utc(),
-        active_power_w=active_power_w,
-        energy_kwh_total=energy_kwh,
+        active_power_w=_find_sensor(aggregate, "activePower"),
+        energy_kwh_total=(forward_wh / 1000.0) if forward_wh is not None else None,
+        reverse_energy_kwh_total=(reverse_wh / 1000.0) if reverse_wh is not None else None,
+        apparent_power_va=_find_sensor(aggregate, "apparentPower"),
+        reactive_power_var=_find_sensor(aggregate, "reactivePower"),
+        voltage_v=(voltage_dv / 10.0) if voltage_dv is not None else None,
+        frequency_hz=(freq_mhz / 1000.0) if freq_mhz is not None else None,
+        phase_l1=_phase(1),
+        phase_l2=_phase(2),
+        phase_l3=_phase(3),
         raw=payload,
     )
 

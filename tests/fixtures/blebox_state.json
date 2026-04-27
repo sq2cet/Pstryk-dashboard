@@ -44,12 +44,18 @@
 
         {"id": 1, "type": "forwardActiveEnergy", "value": 31934, "state": 2},
         {"id": 1, "type": "activePower", "value": 151, "state": 2},
+        {"id": 1, "type": "voltage", "value": 2448, "state": 2},
+        {"id": 1, "type": "current", "value": 1382, "state": 2},
 
         {"id": 2, "type": "forwardActiveEnergy", "value": 44488, "state": 2},
         {"id": 2, "type": "activePower", "value": 267, "state": 2},
+        {"id": 2, "type": "voltage", "value": 2444, "state": 2},
+        {"id": 2, "type": "current", "value": 1414, "state": 2},
 
         {"id": 3, "type": "forwardActiveEnergy", "value": 33022, "state": 2},
-        {"id": 3, "type": "activePower", "value": 102, "state": 2}
+        {"id": 3, "type": "activePower", "value": 102, "state": 2},
+        {"id": 3, "type": "voltage", "value": 2444, "state": 2},
+        {"id": 3, "type": "current", "value": 1020, "state": 2}
       ]
     }
   }

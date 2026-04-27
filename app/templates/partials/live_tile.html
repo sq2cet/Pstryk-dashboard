@@ -1,35 +1,123 @@
 {# Live tile fragment — refreshed by HTMX every 5s. #}
-<div class="live-grid">
-  <div class="live-cell">
-    <div class="live-label">Now</div>
-    <div class="live-value">
-      {% if active_power_w is not none %}
-        ⚡ {{ "%.0f"|format(active_power_w) }} <small>W</small>
-      {% else %}
-        <span class="muted">no reading yet</span>
-      {% endif %}
+<div class="tile-section">
+  <h3 class="tile-section-title">Now</h3>
+  <div class="live-grid">
+    <div class="live-cell">
+      <div class="live-label">Power</div>
+      <div class="live-value">
+        {% if reading and reading.active_power_w is not none %}
+          ⚡ {{ "%.0f"|format(reading.active_power_w) }} <small>W</small>
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </div>
     </div>
-  </div>
-  <div class="live-cell">
-    <div class="live-label">Price</div>
-    <div class="live-value">
-      {% if current_price_pln_per_kwh is not none %}
-        {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
-      {% else %}
-        <span class="muted">—</span>
-      {% endif %}
+    <div class="live-cell">
+      <div class="live-label">Price</div>
+      <div class="live-value">
+        {% if current_price_pln_per_kwh is not none %}
+          {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
+          {% if is_cheap_now %}<span class="pill pill-ok">cheap</span>{% endif %}
+          {% if is_expensive_now %}<span class="pill pill-warn">expensive</span>{% endif %}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </div>
     </div>
-  </div>
-  <div class="live-cell">
-    <div class="live-label">Today</div>
-    <div class="live-value">
-      {{ "%.2f"|format(today_kwh) }} <small>kWh</small>
+    <div class="live-cell">
+      <div class="live-label">Today</div>
+      <div class="live-value">
+        {{ "%.2f"|format(today_kwh) }} <small>kWh</small>
+        <span class="muted small"> · {{ "%.2f"|format(today_cost_pln) }} PLN</span>
+      </div>
     </div>
-  </div>
-  <div class="live-cell">
-    <div class="live-label">Today's cost</div>
-    <div class="live-value">
-      {{ "%.2f"|format(today_cost_pln) }} <small>PLN</small>
+    <div class="live-cell">
+      <div class="live-label">This month</div>
+      <div class="live-value">
+        {{ "%.1f"|format(month_kwh) }} <small>kWh</small>
+        <span class="muted small"> · {{ "%.2f"|format(month_cost_pln) }} PLN</span>
+      </div>
+    </div>
+    <div class="live-cell">
+      <div class="live-label">This year</div>
+      <div class="live-value">
+        {{ "%.0f"|format(year_kwh) }} <small>kWh</small>
+        <span class="muted small"> · {{ "%.0f"|format(year_cost_pln) }} PLN</span>
+      </div>
     </div>
   </div>
 </div>
+
+{% if reading and (reading.phase_l1 or reading.phase_l2 or reading.phase_l3) %}
+<div class="tile-section">
+  <h3 class="tile-section-title">Per phase</h3>
+  <div class="phase-grid">
+    {% for label, p in [("L1", reading.phase_l1), ("L2", reading.phase_l2), ("L3", reading.phase_l3)] %}
+      <div class="phase-cell">
+        <div class="live-label">{{ label }}</div>
+        <div class="phase-power">
+          {% if p and p.active_power_w is not none %}
+            {{ "%.0f"|format(p.active_power_w) }} <small>W</small>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </div>
+        <div class="phase-meta muted small">
+          {% if p and p.voltage_v is not none %}{{ "%.1f"|format(p.voltage_v) }} V{% endif %}
+          {% if p and p.current_a is not none %} · {{ "%.2f"|format(p.current_a) }} A{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if reading and (reading.voltage_v is not none or reading.frequency_hz is not none or reading.power_factor is not none or reading.reverse_energy_kwh_total is not none) %}
+<div class="tile-section">
+  <h3 class="tile-section-title">Diagnostics</h3>
+  <div class="diag-grid">
+    {% if reading.voltage_v is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Voltage</span>
+      <span>{{ "%.1f"|format(reading.voltage_v) }} V</span>
+    </div>
+    {% endif %}
+    {% if reading.frequency_hz is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Frequency</span>
+      <span>{{ "%.3f"|format(reading.frequency_hz) }} Hz</span>
+    </div>
+    {% endif %}
+    {% if reading.power_factor is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Power factor</span>
+      <span>{{ "%.2f"|format(reading.power_factor) }}</span>
+    </div>
+    {% endif %}
+    {% if reading.apparent_power_va is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Apparent</span>
+      <span>{{ "%.0f"|format(reading.apparent_power_va) }} VA</span>
+    </div>
+    {% endif %}
+    {% if reading.reactive_power_var is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Reactive</span>
+      <span>{{ "%.0f"|format(reading.reactive_power_var) }} var</span>
+    </div>
+    {% endif %}
+    {% if reading.energy_kwh_total is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Forward (import)</span>
+      <span>{{ "%.3f"|format(reading.energy_kwh_total) }} kWh</span>
+    </div>
+    {% endif %}
+    {% if reading.reverse_energy_kwh_total is not none %}
+    <div class="diag-cell">
+      <span class="muted small">Reverse (export)</span>
+      <span>{{ "%.3f"|format(reading.reverse_energy_kwh_total) }} kWh</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

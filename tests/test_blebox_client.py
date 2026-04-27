@@ -86,10 +86,40 @@ async def test_read_state_unsupported_device() -> None:
 
 def test_parse_multisensor_filters_to_id0_and_converts_units() -> None:
     reading = parse_multisensor_state(FIXTURE["multisensor_state"])
-    # Only id=0 sensors should drive the result, regardless of how many
-    # per-phase entries exist.
+    # Totals come from id=0 sensors.
     assert reading.active_power_w == 520.0
     assert reading.energy_kwh_total == pytest.approx(109.443)
+    assert reading.reverse_energy_kwh_total == 0.0
+    # decivolts -> volts, millihertz -> hertz, mA -> A
+    assert reading.voltage_v == pytest.approx(245.0)
+    assert reading.frequency_hz == pytest.approx(50.060)
+    assert reading.apparent_power_va == 933.0
+    assert reading.reactive_power_var == -528.0
+    # power factor = |520| / 933
+    assert reading.power_factor == pytest.approx(520 / 933, abs=1e-3)
+
+
+def test_parse_multisensor_extracts_per_phase() -> None:
+    reading = parse_multisensor_state(FIXTURE["multisensor_state"])
+    assert reading.phase_l1.active_power_w == 151.0
+    assert reading.phase_l1.voltage_v == pytest.approx(244.8)
+    assert reading.phase_l1.current_a == pytest.approx(1.382)
+    assert reading.phase_l2.active_power_w == 267.0
+    assert reading.phase_l3.active_power_w == 102.0
+    assert reading.phase_l3.current_a == pytest.approx(1.020)
+
+
+def test_power_factor_returns_none_when_apparent_zero() -> None:
+    from app.clients.blebox import BleBoxReading
+
+    r = BleBoxReading(
+        ts_utc=parse_multisensor_state(FIXTURE["multisensor_state"]).ts_utc,
+        active_power_w=0.0,
+        energy_kwh_total=None,
+        raw={},
+        apparent_power_va=0.0,
+    )
+    assert r.power_factor is None
 
 
 def test_parse_multisensor_with_no_id0_yields_none() -> None:

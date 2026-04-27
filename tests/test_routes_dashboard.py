@@ -24,8 +24,11 @@ def test_live_tile_no_data_yet() -> None:
     with TestClient(app) as client:
         response = client.get("/partials/live")
     assert response.status_code == 200
-    assert "no reading yet" in response.text
-    assert "Today" in response.text
+    # Without a reading, the per-phase / diagnostics sections must not
+    # render and the "Now" section's Power cell shows the muted dash.
+    assert "Per phase" not in response.text
+    assert "Diagnostics" not in response.text
+    assert "This month" in response.text  # totals section still rendered
 
 
 def test_live_tile_with_cached_reading() -> None:
@@ -114,3 +117,52 @@ def test_hourly_chart_clamps_invalid_hours_param() -> None:
     with TestClient(app) as client:
         response = client.get("/api/charts/hourly?hours=0")
     assert response.status_code == 422
+
+
+def test_range_endpoint_returns_buckets_totals_cumulative() -> None:
+    _configure()
+    with TestClient(app) as client:
+        response = client.get("/api/charts/range?range=today&resolution=hour")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["range"] == "today"
+    assert body["resolution"] == "hour"
+    assert "buckets" in body
+    assert "totals" in body
+    assert "cumulative_cost_pln" in body
+    assert len(body["cumulative_cost_pln"]) == len(body["buckets"])
+    for k in ("kwh", "cost_pln", "avg_price_pln_per_kwh", "bucket_count"):
+        assert k in body["totals"]
+
+
+def test_range_endpoint_rejects_bad_resolution() -> None:
+    _configure()
+    with TestClient(app) as client:
+        response = client.get("/api/charts/range?range=today&resolution=fortnight")
+    assert response.status_code == 400
+
+
+def test_range_endpoint_rejects_custom_without_dates() -> None:
+    _configure()
+    with TestClient(app) as client:
+        response = client.get("/api/charts/range?range=custom")
+    assert response.status_code == 400
+
+
+def test_cheapest_hours_partial_renders() -> None:
+    _configure()
+    now_hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0, tzinfo=None)
+    with Session(engine) as s:
+        upsert_pstryk_prices(
+            s,
+            [
+                HourlyPrice(now_hour + timedelta(hours=h), 0.5 + 0.05 * h, "forecast")
+                for h in range(0, 24)
+            ],
+        )
+
+    with TestClient(app) as client:
+        response = client.get("/partials/cheapest-hours")
+    assert response.status_code == 200
+    assert "Cheapest" in response.text
+    assert "Most expensive" in response.text

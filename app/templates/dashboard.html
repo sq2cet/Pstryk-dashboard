@@ -8,13 +8,97 @@
   <div class="muted">loading live reading…</div>
 </section>
 
+<section class="card forecast-card"
+         hx-get="/partials/cheapest-hours"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML">
+  <div class="muted">loading forecast…</div>
+</section>
+
+<section class="card filter-card">
+  <form id="filter-form" class="filter-bar">
+    <label>
+      <span class="muted small">Range</span>
+      <select name="range" id="f-range">
+        <option value="24h">Last 24 h</option>
+        <option value="today" selected>Today</option>
+        <option value="week">Last 7 days</option>
+        <option value="month">This month</option>
+        <option value="year">This year</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </label>
+    <label class="custom-only" hidden>
+      <span class="muted small">From</span>
+      <input type="date" name="from" id="f-from" />
+    </label>
+    <label class="custom-only" hidden>
+      <span class="muted small">To</span>
+      <input type="date" name="to" id="f-to" />
+    </label>
+    <label>
+      <span class="muted small">Resolution</span>
+      <select name="resolution" id="f-resolution">
+        <option value="">(auto)</option>
+        <option value="hour">Hourly</option>
+        <option value="day">Daily</option>
+        <option value="month">Monthly</option>
+        <option value="year">Yearly</option>
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="card totals-card">
+  <div id="totals" class="totals-grid">
+    <div class="total-cell"><span class="muted small">Energy used</span><span id="t-kwh">—</span></div>
+    <div class="total-cell"><span class="muted small">Cost</span><span id="t-cost">—</span></div>
+    <div class="total-cell"><span class="muted small">Avg price</span><span id="t-avg">—</span></div>
+    <div class="total-cell"><span class="muted small">Min price</span><span id="t-min">—</span></div>
+    <div class="total-cell"><span class="muted small">Max price</span><span id="t-max">—</span></div>
+    <div class="total-cell"><span class="muted small">Buckets</span><span id="t-count">—</span></div>
+  </div>
+</section>
+
 <section class="card chart-card">
   <header class="chart-header">
-    <h2>Last 24 h price &amp; consumption</h2>
-    <span class="muted small">forecast next 24 h on the right</span>
+    <h2 id="chart-title">Price &amp; consumption</h2>
+    <span class="muted small" id="chart-subtitle"></span>
   </header>
   <div class="chart-wrap">
-    <canvas id="chart-hourly" aria-label="Hourly price and consumption"></canvas>
+    <canvas id="chart-combo" aria-label="Price line and consumption bars"></canvas>
+  </div>
+</section>
+
+<section class="card chart-card">
+  <header class="chart-header">
+    <h2>Cumulative cost</h2>
+    <span class="muted small">running total over the selected range</span>
+  </header>
+  <div class="chart-wrap chart-wrap-short">
+    <canvas id="chart-cumcost" aria-label="Cumulative cost over range"></canvas>
+  </div>
+</section>
+
+<section class="card table-card">
+  <header class="chart-header">
+    <h2>Per-bucket aggregates</h2>
+    <span class="muted small" id="table-subtitle"></span>
+  </header>
+  <div class="table-wrap">
+    <table class="agg-table" id="agg-table">
+      <thead>
+        <tr>
+          <th>Bucket</th>
+          <th class="num">kWh</th>
+          <th class="num">Avg PLN/kWh</th>
+          <th class="num">Min</th>
+          <th class="num">Max</th>
+          <th class="num">Cost (PLN)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 </section>
 
