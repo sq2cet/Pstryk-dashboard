@@ -18,7 +18,12 @@ from app.models import MeterReading, PstrykPrice, utcnow_naive
 
 
 def upsert_pstryk_prices(session: Session, prices: list[HourlyPrice]) -> int:
-    """Upsert hourly prices keyed by `ts_utc`. Returns rows written."""
+    """Upsert hourly prices + meter values + cost keyed by `ts_utc`.
+
+    Pstryk's `meterValues` / `cost` are NULL on forecast rows, so we
+    only overwrite the kwh/cost fields when a row carries them — a
+    historical refresh must not blank-out a previously-stored kWh.
+    """
     written = 0
     for p in prices:
         existing = session.get(PstrykPrice, p.ts_utc)
@@ -30,12 +35,21 @@ def upsert_pstryk_prices(session: Session, prices: list[HourlyPrice]) -> int:
                     kind=p.kind,
                     raw_json=None,
                     fetched_at=utcnow_naive(),
+                    kwh_import=p.kwh_import,
+                    kwh_export=p.kwh_export,
+                    cost_pln=p.cost_pln,
                 )
             )
         else:
             existing.price_pln_per_kwh = p.price_pln_per_kwh
             existing.kind = p.kind
             existing.fetched_at = utcnow_naive()
+            if p.kwh_import is not None:
+                existing.kwh_import = p.kwh_import
+            if p.kwh_export is not None:
+                existing.kwh_export = p.kwh_export
+            if p.cost_pln is not None:
+                existing.cost_pln = p.cost_pln
             session.add(existing)
         written += 1
     session.commit()

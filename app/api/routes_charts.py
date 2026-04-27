@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
+from app import state
 from app.db import get_session
 from app.models import utcnow_naive
 from app.services import settings_service as svc
@@ -73,6 +74,35 @@ def hourly_chart(
     }
 
 
+@router.get("/api/charts/live-power")
+def live_power(
+    session: SessionDep,
+    minutes: Annotated[int, Query(ge=1, le=120)] = 60,
+) -> dict:
+    """Return the in-memory rolling buffer of recent BleBox readings.
+
+    Each point carries total active power and a per-phase breakdown.
+    Used by the live-power chart, which polls this endpoint every 5 s.
+    """
+    view = svc.get_view(session)
+    cutoff = utcnow_naive() - timedelta(minutes=minutes)
+    points = [r for r in state.recent_readings if r.ts_utc >= cutoff]
+
+    def phase_w(r, attr: str) -> float | None:
+        phase = getattr(r, attr, None)
+        return phase.active_power_w if phase is not None else None
+
+    return {
+        "tz": view.tz,
+        "minutes": minutes,
+        "ts": [r.ts_utc.isoformat() + "Z" for r in points],
+        "total_w": [r.active_power_w for r in points],
+        "l1_w": [phase_w(r, "phase_l1") for r in points],
+        "l2_w": [phase_w(r, "phase_l2") for r in points],
+        "l3_w": [phase_w(r, "phase_l3") for r in points],
+    }
+
+
 @router.get("/api/charts/range")
 def range_chart(
     session: SessionDep,
@@ -100,7 +130,9 @@ def range_chart(
     if res not in {"hour", "day", "month", "year"}:
         raise HTTPException(status_code=400, detail=f"unknown resolution: {res}")
 
-    buckets, totals, cumulative = aggregate_range(session, start_utc, end_utc, res, view.tz)
+    buckets, totals, cumulative_cost, cumulative_kwh = aggregate_range(
+        session, start_utc, end_utc, res, view.tz
+    )
 
     return {
         "tz": view.tz,
@@ -110,5 +142,6 @@ def range_chart(
         "end_utc": end_utc.isoformat() + "Z",
         "buckets": [asdict(b) | {"bucket_utc": b.bucket_utc.isoformat() + "Z"} for b in buckets],
         "totals": totals,
-        "cumulative_cost_pln": cumulative,
+        "cumulative_cost_pln": cumulative_cost,
+        "cumulative_kwh": cumulative_kwh,
     }

@@ -10,6 +10,7 @@ from app.services.ingest import record_meter_reading, upsert_pstryk_prices
 from app.services.timeseries import (
     hour_buckets,
     hourly_consumption_kwh,
+    hourly_metrics,
     hourly_prices,
 )
 
@@ -93,6 +94,51 @@ def test_hourly_prices_returns_dict_keyed_by_ts(session: Session) -> None:
     # End is exclusive — the 12:00 row is outside.
     assert sorted(prices.keys()) == [_ts(2026, 4, 27, 10, 0, 0), _ts(2026, 4, 27, 11, 0, 0)]
     assert prices[_ts(2026, 4, 27, 10, 0, 0)] == 0.42
+
+
+def test_hourly_metrics_prefers_pstryk_kwh_and_cost(session: Session) -> None:
+    upsert_pstryk_prices(
+        session,
+        [
+            HourlyPrice(
+                ts_utc=_ts(2026, 4, 27, 10, 0, 0),
+                price_pln_per_kwh=0.50,
+                kind="historical",
+                kwh_import=2.0,
+                cost_pln=1.10,  # not the same as price * kwh
+            ),
+            HourlyPrice(
+                ts_utc=_ts(2026, 4, 27, 11, 0, 0),
+                price_pln_per_kwh=0.60,
+                kind="historical",
+                # No Pstryk kwh/cost — fall back to BleBox-derived
+            ),
+        ],
+    )
+    base = _ts(2026, 4, 27, 11, 0, 0)
+    record_meter_reading(
+        session,
+        BleBoxReading(ts_utc=base, active_power_w=0.0, energy_kwh_total=0.0, raw={}),
+    )
+    record_meter_reading(
+        session,
+        BleBoxReading(
+            ts_utc=base + timedelta(minutes=30),
+            active_power_w=0.0,
+            energy_kwh_total=0.5,
+            raw={},
+        ),
+    )
+
+    metrics = hourly_metrics(session, _ts(2026, 4, 27, 10, 0, 0), _ts(2026, 4, 27, 12, 0, 0))
+    # Hour 10: Pstryk wins
+    m10 = metrics[_ts(2026, 4, 27, 10, 0, 0)]
+    assert m10.kwh == 2.0
+    assert m10.cost_pln == 1.10
+    # Hour 11: BleBox-derived kwh, derived cost = kwh * price
+    m11 = metrics[_ts(2026, 4, 27, 11, 0, 0)]
+    assert m11.kwh == pytest.approx(0.5)
+    assert m11.cost_pln == pytest.approx(0.5 * 0.60)
 
 
 def test_hourly_consumption_skips_intervals_without_kwh(session: Session) -> None:

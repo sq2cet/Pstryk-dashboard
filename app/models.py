@@ -20,6 +20,11 @@ class PstrykPrice(SQLModel, table=True):
     kind: str  # 'historical' | 'forecast'
     raw_json: str | None = None
     fetched_at: datetime = Field(default_factory=utcnow_naive)
+    # Pstryk reports authoritative hourly meter values + cost alongside
+    # the tariff. NULL for forecast rows where consumption is unknown.
+    kwh_import: float | None = None
+    kwh_export: float | None = None
+    cost_pln: float | None = None
 
 
 class MeterReading(SQLModel, table=True):

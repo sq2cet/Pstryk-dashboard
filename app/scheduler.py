@@ -71,24 +71,22 @@ async def pstryk_poll_job() -> None:
 
 
 async def pstryk_backfill_30d_job() -> None:
-    """One-shot: if the price table is empty, pull the last 30 days."""
+    """At startup: ensure last 30 days + next 24 h of Pstryk metrics
+    (price + kwh + cost) are stored. Idempotent — historical chunks
+    that already have full kWh data are skipped, so a process restart
+    doesn't burn API quota re-fetching what we already have. The
+    forecast window is always fetched to refresh forward prices.
+    """
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
             if not view.is_configured():
-                return
-            existing = session.exec(select(PstrykPrice).limit(1)).first()
-            if existing is not None:
                 return
             api_key = svc.get_plaintext(session, svc.PSTRYK_API_KEY)
         if not api_key:
             return
 
         now = datetime.now(UTC)
-        # Seed both 30 days of history and the next 24h of forecast so the
-        # dashboard has forecast prices on first run, not only after the
-        # 60-min poll job catches up. Chunk size keeps per-call response
-        # sizes reasonable; per-endpoint rate-limit is 3 req/hour.
         windows = [(now, now + timedelta(days=1))]
         for chunk_end_offset in range(0, 30, 7):
             end = now - timedelta(days=chunk_end_offset)
@@ -96,6 +94,13 @@ async def pstryk_backfill_30d_job() -> None:
 
         async with PstrykClient(api_key=api_key) as client:
             for window_start, window_end in windows:
+                if window_end <= now and _chunk_has_full_kwh(window_start, window_end):
+                    logger.info(
+                        "Backfill chunk %s..%s already hydrated, skipping",
+                        window_start.date(),
+                        window_end.date(),
+                    )
+                    continue
                 try:
                     payload = await client.fetch_unified_metrics(window_start, window_end)
                 except PstrykAPIError as exc:
@@ -105,13 +110,42 @@ async def pstryk_backfill_30d_job() -> None:
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
                 logger.info(
-                    "Backfill chunk %s..%s: %d prices",
+                    "Backfill chunk %s..%s: %d rows",
                     window_start.date(),
                     window_end.date(),
                     len(prices),
                 )
     except Exception:
         logger.exception("Pstryk backfill crashed")
+
+
+def _chunk_has_full_kwh(window_start: datetime, window_end: datetime) -> bool:
+    """True if every historical row in the window already has both
+    kwh_import AND cost_pln populated (Pstryk's authoritative meter +
+    cost values). A NULL in either signals the chunk needs re-fetch.
+    """
+    start = window_start.replace(tzinfo=None) if window_start.tzinfo else window_start
+    end = window_end.replace(tzinfo=None) if window_end.tzinfo else window_end
+    with Session(engine) as session:
+        missing = session.exec(
+            select(PstrykPrice)
+            .where(PstrykPrice.ts_utc >= start)
+            .where(PstrykPrice.ts_utc < end)
+            .where(
+                (PstrykPrice.kwh_import.is_(None))  # type: ignore[union-attr]
+                | (PstrykPrice.cost_pln.is_(None))  # type: ignore[union-attr]
+            )
+            .limit(1)
+        ).first()
+        if missing is not None:
+            return False
+        has_any = session.exec(
+            select(PstrykPrice)
+            .where(PstrykPrice.ts_utc >= start)
+            .where(PstrykPrice.ts_utc < end)
+            .limit(1)
+        ).first()
+        return has_any is not None
 
 
 async def blebox_live_job() -> None:

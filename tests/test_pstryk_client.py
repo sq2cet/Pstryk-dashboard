@@ -35,7 +35,7 @@ async def test_fetch_unified_metrics_success(window: tuple[datetime, datetime]) 
     # Auth header is the raw token without a Bearer/Token prefix.
     assert request.headers["authorization"] == "sk-abc"
     # Required query params are present.
-    assert request.url.params["metrics"] == "pricing"
+    assert request.url.params["metrics"] == "pricing,meter_values,cost"
     assert request.url.params["resolution"] == "hour"
     assert "summary" in payload
 
@@ -97,6 +97,19 @@ def test_parse_hourly_prices_extracts_price_gross() -> None:
     assert [p.price_pln_per_kwh for p in parsed] == [0.5328, 0.6010, 0.7500]
     # The first two frames are in the past, the 2099 frame is in the future.
     assert [p.kind for p in parsed] == ["historical", "historical", "forecast"]
+
+
+def test_parse_hourly_prices_extracts_meter_and_cost() -> None:
+    parsed = parse_hourly_prices(FIXTURE)
+    # First frame in fixture has full meterValues + cost.
+    assert parsed[0].kwh_import == 1.5
+    assert parsed[0].kwh_export == 0.0
+    assert parsed[0].cost_pln == pytest.approx(0.7992)
+    # Remaining frames carry no meter/cost — fields stay None.
+    assert parsed[1].kwh_import is None
+    assert parsed[1].cost_pln is None
+    assert parsed[2].kwh_import is None
+    assert parsed[2].cost_pln is None
 
 
 def test_parse_hourly_prices_falls_back_to_full_price() -> None:

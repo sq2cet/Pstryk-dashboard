@@ -1,6 +1,12 @@
-// Render the dashboard's combo chart, cumulative-cost chart, totals
-// strip, and aggregates table from /api/charts/range. The filter form
-// drives all of it: any change refetches and redraws.
+// Three charts on the dashboard:
+//   1. Live power (per-phase, last 60 min, 5 s cadence) — auto-refresh
+//   2. Combo chart (avg price line + consumption bars) — driven by filter
+//   3. Cumulative chart (running cost + running usage, dual axis) —
+//      driven by filter
+//
+// Filter changes refetch /api/charts/range and redraw 2 + 3 plus the
+// totals strip and the aggregates table. The live-power chart polls
+// /api/charts/live-power on its own 5 s timer.
 
 (() => {
   const form = document.getElementById("filter-form");
@@ -14,6 +20,7 @@
 
   let comboChart = null;
   let cumChart = null;
+  let liveChart = null;
 
   const NUM = (v, digits = 2) =>
     v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
@@ -35,6 +42,7 @@
     return d.toLocaleString([], opts);
   }
 
+  // --- Filter-driven charts ---------------------------------------------
   async function refresh() {
     const params = new URLSearchParams();
     params.set("range", fRange.value);
@@ -51,16 +59,13 @@
         `Could not load (HTTP ${res.status})`;
       return;
     }
-    const data = await res.json();
-    render(data);
+    render(await res.json());
   }
 
   function render(data) {
     const labels = data.buckets.map((b) => bucketLabel(b.bucket_local_iso, data.resolution));
     const prices = data.buckets.map((b) => b.avg_price_pln_per_kwh);
     const kwh = data.buckets.map((b) => b.kwh);
-    const cumulative = data.cumulative_cost_pln;
-    const nowIdx = data.buckets.findIndex((b) => b.is_now);
 
     document.getElementById("chart-title").textContent =
       `Price & consumption · ${data.range} · ${data.resolution}`;
@@ -76,12 +81,12 @@
     document.getElementById("t-max").textContent = NUM(data.totals.max_price_pln_per_kwh, 4);
     document.getElementById("t-count").textContent = data.totals.bucket_count;
 
-    renderCombo(labels, prices, kwh, nowIdx);
-    renderCumulative(labels, cumulative);
+    renderCombo(labels, prices, kwh);
+    renderCumulative(labels, data.cumulative_cost_pln, data.cumulative_kwh);
     renderTable(data.buckets, data.resolution);
   }
 
-  function renderCombo(labels, prices, kwh, nowIdx) {
+  function renderCombo(labels, prices, kwh) {
     const canvas = document.getElementById("chart-combo");
     if (comboChart) comboChart.destroy();
     comboChart = new Chart(canvas, {
@@ -127,38 +132,57 @@
             ticks: { color: "#8a8f98" },
           },
         },
-        nowIdx,
       }),
     });
   }
 
-  function renderCumulative(labels, cumulative) {
+  function renderCumulative(labels, cumulativeCost, cumulativeKwh) {
     const canvas = document.getElementById("chart-cumcost");
     if (cumChart) cumChart.destroy();
     cumChart = new Chart(canvas, {
-      type: "line",
       data: {
         labels,
         datasets: [
           {
+            type: "line",
             label: "Cumulative cost (PLN)",
-            data: cumulative,
+            data: cumulativeCost,
             borderColor: "#9affb6",
             backgroundColor: "rgba(154, 255, 182, 0.15)",
             fill: true,
             tension: 0.2,
             pointRadius: 0,
             spanGaps: true,
+            yAxisID: "y_cost",
+          },
+          {
+            type: "line",
+            label: "Cumulative usage (kWh)",
+            data: cumulativeKwh,
+            borderColor: "#f5c518",
+            backgroundColor: "rgba(245, 197, 24, 0.0)",
+            borderDash: [4, 4],
+            tension: 0.2,
+            pointRadius: 0,
+            spanGaps: true,
+            yAxisID: "y_kwh",
           },
         ],
       },
       options: chartCommon({
         scales: {
-          y: {
+          y_cost: {
             type: "linear",
             position: "left",
             title: { display: true, text: "PLN" },
             grid: { color: "rgba(255,255,255,0.05)" },
+            ticks: { color: "#8a8f98" },
+          },
+          y_kwh: {
+            type: "linear",
+            position: "right",
+            title: { display: true, text: "kWh" },
+            grid: { display: false },
             ticks: { color: "#8a8f98" },
           },
         },
@@ -166,7 +190,7 @@
     });
   }
 
-  function chartCommon({ scales, nowIdx }) {
+  function chartCommon({ scales }) {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -178,9 +202,7 @@
           grid: { color: "rgba(255,255,255,0.05)" },
         },
       },
-      plugins: {
-        legend: { labels: { color: "#e6e8eb" } },
-      },
+      plugins: { legend: { labels: { color: "#e6e8eb" } } },
     };
   }
 
@@ -210,6 +232,53 @@
   fFrom.addEventListener("change", refresh);
   fTo.addEventListener("change", refresh);
 
-  // Initial render
+  // --- Live-power chart -------------------------------------------------
+  async function refreshLivePower() {
+    const res = await fetch("/api/charts/live-power?minutes=60");
+    if (!res.ok) return;
+    const data = await res.json();
+    renderLivePower(data);
+  }
+
+  function renderLivePower(data) {
+    const labels = data.ts.map((iso) =>
+      new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    );
+    const datasets = [
+      { label: "Total", data: data.total_w, borderColor: "#e6e8eb" },
+      { label: "L1", data: data.l1_w, borderColor: "#7ec8ff" },
+      { label: "L2", data: data.l2_w, borderColor: "#9affb6" },
+      { label: "L3", data: data.l3_w, borderColor: "#f5c518" },
+    ].map((d) => ({
+      ...d,
+      type: "line",
+      borderWidth: 1.5,
+      tension: 0.15,
+      pointRadius: 0,
+      spanGaps: true,
+      backgroundColor: d.borderColor,
+    }));
+
+    const canvas = document.getElementById("chart-live-power");
+    if (!canvas) return;
+    if (liveChart) liveChart.destroy();
+    liveChart = new Chart(canvas, {
+      data: { labels, datasets },
+      options: chartCommon({
+        scales: {
+          y: {
+            type: "linear",
+            position: "left",
+            title: { display: true, text: "W" },
+            grid: { color: "rgba(255,255,255,0.05)" },
+            ticks: { color: "#8a8f98" },
+          },
+        },
+      }),
+    });
+  }
+
   refresh();
+  refreshLivePower();
+  setInterval(refreshLivePower, 5000);
 })();

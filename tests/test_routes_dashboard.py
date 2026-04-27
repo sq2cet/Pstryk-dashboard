@@ -149,6 +149,36 @@ def test_range_endpoint_rejects_custom_without_dates() -> None:
     assert response.status_code == 400
 
 
+def test_live_power_endpoint_reflects_buffer() -> None:
+    _configure()
+    state.reset_buffers()
+    from app.clients.blebox import BleBoxReading, PhaseReading
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    state.set_last_reading(
+        BleBoxReading(
+            ts_utc=now,
+            active_power_w=521.0,
+            energy_kwh_total=109.5,
+            raw={},
+            phase_l1=PhaseReading(active_power_w=151.0),
+            phase_l2=PhaseReading(active_power_w=267.0),
+            phase_l3=PhaseReading(active_power_w=103.0),
+        )
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/charts/live-power?minutes=10")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["ts"]) == 1
+    assert body["total_w"] == [521.0]
+    assert body["l1_w"] == [151.0]
+    assert body["l2_w"] == [267.0]
+    assert body["l3_w"] == [103.0]
+    state.reset_buffers()
+
+
 def test_cheapest_hours_partial_renders() -> None:
     _configure()
     now_hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0, tzinfo=None)

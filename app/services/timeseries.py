@@ -1,14 +1,22 @@
 """Aggregate raw readings + prices into the time series the UI expects.
 
-`hourly_consumption_kwh` buckets per-interval kWh into UTC hour buckets
-by interval midpoint; the result is what the dashboard's combo chart
-plots as bars. `hourly_prices` is a flat lookup of stored hourly prices
-for the same window. The two share the same bucket key (a naive UTC
-datetime at the top of the hour) so the UI can zip them.
+For each UTC hour we may have three data sources:
+
+- Pstryk's stored hourly meter reading (`PstrykPrice.kwh_import`) —
+  authoritative when the hour is in the past and the API has reported
+  consumption for it.
+- Pstryk's stored hourly cost (`PstrykPrice.cost_pln`) — same.
+- A trail of BleBox `MeterReading` rows we wrote ourselves at 60 s
+  cadence. The current hour and any hour before Pstryk has reported
+  fall back to this.
+
+`hourly_metrics` merges all three and returns one record per hour
+exposing `kwh`, `cost_pln`, and `price_pln_per_kwh`.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
@@ -16,6 +24,13 @@ from sqlmodel import Session, select
 from app.models import PstrykPrice
 from app.services.cost import kwh_between
 from app.services.ingest import readings_in_range
+
+
+@dataclass(frozen=True)
+class HourlyMetric:
+    kwh: float | None
+    cost_pln: float | None
+    price_pln_per_kwh: float | None
 
 
 def hourly_consumption_kwh(
@@ -51,6 +66,37 @@ def hourly_prices(
     )
     rows = session.exec(stmt).all()
     return {row.ts_utc: row.price_pln_per_kwh for row in rows}
+
+
+def hourly_metrics(
+    session: Session, start_utc: datetime, end_utc: datetime
+) -> dict[datetime, HourlyMetric]:
+    """Per-hour merged metrics over a UTC range.
+
+    Pstryk's stored kwh + cost win; BleBox-derived kwh fills the gaps
+    (typically the current hour or hours before Pstryk reports). When
+    only price + kwh are known, cost is derived as kwh * price.
+    """
+    bb_kwh = hourly_consumption_kwh(session, start_utc, end_utc)
+
+    rows = session.exec(
+        select(PstrykPrice)
+        .where(PstrykPrice.ts_utc >= start_utc)
+        .where(PstrykPrice.ts_utc < end_utc)
+    ).all()
+    by_ts: dict[datetime, PstrykPrice] = {r.ts_utc: r for r in rows}
+
+    keys = set(by_ts) | set(bb_kwh)
+    out: dict[datetime, HourlyMetric] = {}
+    for ts in keys:
+        row = by_ts.get(ts)
+        price = row.price_pln_per_kwh if row else None
+        kwh = (row.kwh_import if row and row.kwh_import is not None else None) or bb_kwh.get(ts)
+        cost = row.cost_pln if row and row.cost_pln is not None else None
+        if cost is None and kwh is not None and price is not None:
+            cost = kwh * price
+        out[ts] = HourlyMetric(kwh=kwh, cost_pln=cost, price_pln_per_kwh=price)
+    return out
 
 
 def hour_buckets(start_utc: datetime, end_utc: datetime) -> list[datetime]:

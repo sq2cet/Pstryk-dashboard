@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 from sqlmodel import Session
 
-from app.services.timeseries import hour_buckets, hourly_consumption_kwh, hourly_prices
+from app.services.timeseries import hour_buckets, hourly_metrics
 
 Resolution = Literal["hour", "day", "month", "year"]
 RangePreset = Literal["24h", "today", "week", "month", "year", "custom"]
@@ -125,11 +125,10 @@ def aggregate_range(
     end_utc: datetime,
     resolution: Resolution,
     tz_name: str,
-) -> tuple[list[BucketRow], dict, list[float | None]]:
+) -> tuple[list[BucketRow], dict, list[float | None], list[float | None]]:
     """Return (buckets, totals, cumulative_cost) for the given window."""
     tz = ZoneInfo(tz_name)
-    prices_h = hourly_prices(session, start_utc, end_utc)
-    kwh_h = hourly_consumption_kwh(session, start_utc, end_utc)
+    metrics_h = hourly_metrics(session, start_utc, end_utc)
     h_buckets = hour_buckets(start_utc, end_utc)
 
     # Group hour-level metrics by resolution-level bucket key.
@@ -138,17 +137,25 @@ def aggregate_range(
         key = _bucket_key_for(hb, resolution, tz)
         bucket = grouped.setdefault(
             key,
-            {"prices": [], "kwh": [], "weighted_cost": 0.0, "weighted_kwh": 0.0},
+            {
+                "prices": [],
+                "kwh_sum": 0.0,
+                "had_kwh": False,
+                "cost_sum": 0.0,
+                "had_cost": False,
+            },
         )
-        p = prices_h.get(hb)
-        k = kwh_h.get(hb)
-        if p is not None:
-            bucket["prices"].append(p)
-        if k is not None:
-            bucket["kwh"].append(k)
-            if p is not None:
-                bucket["weighted_cost"] += p * k
-                bucket["weighted_kwh"] += k
+        m = metrics_h.get(hb)
+        if m is None:
+            continue
+        if m.price_pln_per_kwh is not None:
+            bucket["prices"].append(m.price_pln_per_kwh)
+        if m.kwh is not None:
+            bucket["kwh_sum"] += m.kwh
+            bucket["had_kwh"] = True
+        if m.cost_pln is not None:
+            bucket["cost_sum"] += m.cost_pln
+            bucket["had_cost"] = True
 
     # Now-marker
     current_hour_utc = (
@@ -158,20 +165,23 @@ def aggregate_range(
 
     rows: list[BucketRow] = []
     cumulative: list[float | None] = []
+    cumulative_kwh: list[float | None] = []
     running_cost = 0.0
+    running_kwh = 0.0
     total_kwh = 0.0
     total_cost = 0.0
     all_prices: list[float] = []
 
     for key in sorted(grouped):
         b = grouped[key]
-        kwh_sum = sum(b["kwh"]) if b["kwh"] else None
-        if b["weighted_kwh"] > 0:
-            avg_price = b["weighted_cost"] / b["weighted_kwh"]
-            cost = b["weighted_cost"]
+        kwh_sum = b["kwh_sum"] if b["had_kwh"] else None
+        cost = b["cost_sum"] if b["had_cost"] else None
+        if cost is not None and kwh_sum and kwh_sum > 0:
+            avg_price = cost / kwh_sum
+        elif b["prices"]:
+            avg_price = sum(b["prices"]) / len(b["prices"])
         else:
-            avg_price = (sum(b["prices"]) / len(b["prices"])) if b["prices"] else None
-            cost = None
+            avg_price = None
         min_p = min(b["prices"]) if b["prices"] else None
         max_p = max(b["prices"]) if b["prices"] else None
 
@@ -183,7 +193,12 @@ def aggregate_range(
             cumulative.append(running_cost if rows else None)
 
         if kwh_sum is not None:
+            running_kwh += kwh_sum
+            cumulative_kwh.append(running_kwh)
             total_kwh += kwh_sum
+        else:
+            cumulative_kwh.append(running_kwh if rows else None)
+
         if b["prices"]:
             all_prices.extend(b["prices"])
 
@@ -212,4 +227,4 @@ def aggregate_range(
         "max_price_pln_per_kwh": max(all_prices) if all_prices else None,
         "bucket_count": len(rows),
     }
-    return rows, totals, cumulative
+    return rows, totals, cumulative, cumulative_kwh

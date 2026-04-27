@@ -5,19 +5,25 @@
       "end": "2026-04-26T23:00:00Z",
       "metrics": {
         "pricing": {
-          "tge_price": 0.254,
-          "dist_price": 0.0951,
-          "service_price": 0.08,
-          "base_price": 0.4291,
-          "vat_component": 0.0987,
-          "excise_component": 0.005,
-          "full_price": 0.5328,
-          "price_net": 0.254,
           "price_gross": 0.5328,
-          "price_prosumer_net": 0.254,
-          "price_prosumer_gross": 0.31242,
           "is_cheap": true,
           "is_expensive": false
+        },
+        "meter_values": {
+          "energy_active_import_register": 1.5,
+          "energy_active_export_register": 0.0,
+          "energy_balance": 1.5
+        },
+        "cost": {
+          "var_dist_cost_net": 0.07,
+          "fix_dist_cost_net": 0.11,
+          "energy_cost_net": 0.38,
+          "service_cost_net": 0.04,
+          "excise": 0.005,
+          "vat": 0.1342,
+          "energy_import_cost": 0.7992,
+          "energy_sold_value": 0.0,
+          "energy_balance_value": 0.7992
         }
       }
     },

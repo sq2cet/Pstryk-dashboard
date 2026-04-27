@@ -8,6 +8,16 @@
   <div class="muted">loading live reading…</div>
 </section>
 
+<section class="card chart-card">
+  <header class="chart-header">
+    <h2>Live power · last 60 min</h2>
+    <span class="muted small">5 s resolution · per phase</span>
+  </header>
+  <div class="chart-wrap chart-wrap-short">
+    <canvas id="chart-live-power" aria-label="Live per-phase power"></canvas>
+  </div>
+</section>
+
 <section class="card forecast-card"
          hx-get="/partials/cheapest-hours"
          hx-trigger="load, every 60s"

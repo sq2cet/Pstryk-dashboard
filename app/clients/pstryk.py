@@ -45,6 +45,9 @@ class HourlyPrice:
     ts_utc: datetime
     price_pln_per_kwh: float
     kind: str  # 'historical' | 'forecast'
+    kwh_import: float | None = None
+    kwh_export: float | None = None
+    cost_pln: float | None = None
 
 
 class PstrykClient:
@@ -79,13 +82,15 @@ class PstrykClient:
         window_start: datetime,
         window_end: datetime,
         resolution: str = "hour",
-        metrics: str = "pricing",
+        metrics: str = "pricing,meter_values,cost",
     ) -> dict:
         """Fetch the unified-metrics endpoint for the given UTC window.
 
         `metrics` is a comma-separated subset of
-        {`meter_values`, `cost`, `carbon`, `pricing`}. Defaults to
-        `pricing` which is what the dashboard's tariff backfill needs.
+        {`meter_values`, `cost`, `carbon`, `pricing`}. Defaults to all
+        three the dashboard cares about — pricing drives the line
+        chart, meter_values populate the consumption bars, cost feeds
+        the cumulative-cost area.
         """
         params = {
             "metrics": metrics,
@@ -122,14 +127,17 @@ class PstrykClient:
 
 
 def parse_hourly_prices(payload: dict) -> list[HourlyPrice]:
-    """Parse the gross PLN/kWh price out of `frames[].metrics.pricing`.
+    """Parse `frames[]` into HourlyPrice rows with price + meter + cost.
 
-    The Pstryk API returns hourly frames with a nested `pricing` object
-    containing `price_gross` (the consumer-facing price including
-    distribution + service + VAT + excise). Frames whose `start` is in
-    the future are tagged `forecast`; everything else is `historical`.
-    Frames carrying `is_live: true` are the current hour and are also
-    treated as historical (the price for the current hour is fixed).
+    For each frame:
+    - `metrics.pricing.price_gross` (or `full_price`) -> price_pln_per_kwh
+    - `metrics.meterValues.energy_active_import_register` -> kwh_import
+    - `metrics.meterValues.energy_active_export_register` -> kwh_export
+    - `metrics.cost.total_cost` -> cost_pln (consumer-facing total)
+
+    Forecast frames generally have no `meterValues` / `cost` (no usage
+    yet); those fields stay None. is_live frames (current hour) keep
+    the historical kind because the tariff is fixed at midnight.
     """
     frames = payload.get("frames") or []
     parsed: list[HourlyPrice] = []
@@ -146,16 +154,36 @@ def parse_hourly_prices(payload: dict) -> list[HourlyPrice]:
             )
         except ValueError:
             continue
-        pricing = (frame.get("metrics") or {}).get("pricing") or {}
-        price = pricing.get("price_gross")
-        if price is None:
-            price = pricing.get("full_price")
+        metrics = frame.get("metrics") or {}
+        pricing = metrics.get("pricing") or {}
+        price = pricing.get("price_gross") or pricing.get("full_price")
         if not isinstance(price, (int, float)):
             continue
+
+        meter = metrics.get("meterValues") or metrics.get("meter_values") or {}
+        cost = metrics.get("cost") or {}
+        # Real responses use `energy_import_cost` (consumer gross total
+        # = sum of energy + dist + service + excise + vat). The
+        # OpenAPI example shows `total_cost`; we accept both.
+        cost_pln = _num(cost.get("energy_import_cost") or cost.get("total_cost"))
+
         kind = "forecast" if (ts > now and not frame.get("is_live")) else "historical"
-        parsed.append(HourlyPrice(ts_utc=ts, price_pln_per_kwh=float(price), kind=kind))
+        parsed.append(
+            HourlyPrice(
+                ts_utc=ts,
+                price_pln_per_kwh=float(price),
+                kind=kind,
+                kwh_import=_num(meter.get("energy_active_import_register")),
+                kwh_export=_num(meter.get("energy_active_export_register")),
+                cost_pln=cost_pln,
+            )
+        )
     parsed.sort(key=lambda p: p.ts_utc)
     return parsed
+
+
+def _num(value) -> float | None:
+    return float(value) if isinstance(value, (int, float)) else None
 
 
 def _isoformat_utc(dt: datetime) -> str:

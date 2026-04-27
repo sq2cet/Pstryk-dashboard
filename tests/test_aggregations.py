@@ -58,7 +58,7 @@ def _seed_two_hours(session: Session) -> None:
 
 def test_hourly_aggregate_over_two_hours(session: Session) -> None:
     _seed_two_hours(session)
-    rows, totals, cum = aggregate_range(
+    rows, totals, cum, cum_kwh = aggregate_range(
         session,
         _ts(2026, 4, 27, 10, 0, 0),
         _ts(2026, 4, 27, 12, 0, 0),
@@ -76,11 +76,12 @@ def test_hourly_aggregate_over_two_hours(session: Session) -> None:
     assert totals["min_price_pln_per_kwh"] == 0.40
     assert totals["max_price_pln_per_kwh"] == 0.60
     assert cum == pytest.approx([0.40, 1.00])
+    assert cum_kwh == pytest.approx([1.0, 2.0])
 
 
 def test_daily_aggregate_collapses_hours_in_local_tz(session: Session) -> None:
     _seed_two_hours(session)
-    rows, totals, cum = aggregate_range(
+    rows, totals, cum, cum_kwh = aggregate_range(
         session,
         _ts(2026, 4, 27, 10, 0, 0),
         _ts(2026, 4, 27, 12, 0, 0),
