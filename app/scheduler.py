@@ -39,8 +39,18 @@ def is_disabled() -> bool:
     return os.environ.get("PSTRYK_DISABLE_SCHEDULER") == "1"
 
 
+POLL_HISTORY_DAYS = 7
+
+
 async def pstryk_poll_job() -> None:
-    """Pull the last 25h + next 24h of hourly prices, upsert."""
+    """Pull the last 7 days + next 24 h of Pstryk metrics, upsert.
+
+    The window is intentionally wider than just "the last hour" — Pstryk
+    sometimes reports meter values for an hour with a delay of a day or
+    two (smart-meter sync lag). A 7-day rolling window means every
+    hourly tick refreshes the past week's worth of data, so any late
+    fills land in the local DB without needing a manual refresh.
+    """
     try:
         with Session(engine) as session:
             view = svc.get_view(session)
@@ -51,7 +61,7 @@ async def pstryk_poll_job() -> None:
             return
 
         now = datetime.now(UTC)
-        window_start = now - timedelta(hours=25)
+        window_start = now - timedelta(days=POLL_HISTORY_DAYS)
         window_end = now + timedelta(hours=24)
 
         async with PstrykClient(api_key=api_key) as client:
@@ -63,7 +73,7 @@ async def pstryk_poll_job() -> None:
 
         with Session(engine) as session:
             written = upsert_pstryk_prices(session, prices)
-        logger.info("Pstryk poll: wrote %d hourly prices", written)
+        logger.info("Pstryk poll: refreshed %d hourly rows over the last 7 d + 24 h", written)
     except PstrykAPIError as exc:
         logger.warning("Pstryk poll API error: %s", exc)
     except Exception:
