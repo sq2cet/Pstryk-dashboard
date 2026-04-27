@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -10,7 +11,10 @@ from sqlmodel import Session
 
 from app.api import routes_settings
 from app.db import get_session, init_db
+from app.scheduler import build_scheduler, is_disabled
 from app.services import settings_service as svc
+
+logger = logging.getLogger(__name__)
 
 APP_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=APP_DIR / "templates")
@@ -19,9 +23,21 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     init_db()
-    yield
+    if is_disabled():
+        logger.info("Scheduler disabled via PSTRYK_DISABLE_SCHEDULER=1")
+        app.state.scheduler = None
+    else:
+        scheduler = build_scheduler()
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
+    try:
+        yield
+    finally:
+        if app.state.scheduler is not None:
+            app.state.scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="Pstryk Dashboard", lifespan=lifespan)
