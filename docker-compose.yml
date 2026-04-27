@@ -1,0 +1,24 @@
+name: pstryk-dashboard
+
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME:-sq2cet}/pstryk-dashboard:${TAG:-latest}
+    container_name: pstryk-dashboard-app
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8765}:8000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    networks:
+      - pstryk-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  pstryk-net:
+    name: pstryk-net
