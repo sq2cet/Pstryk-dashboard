@@ -1,0 +1,9 @@
+{
+  "prices": [
+    {"start": "2026-04-27T00:00:00Z", "price_gross": 0.42, "is_forecast": false},
+    {"start": "2026-04-27T01:00:00Z", "price_gross": 0.41, "is_forecast": false},
+    {"start": "2026-04-27T02:00:00Z", "price_gross": 0.40, "is_forecast": false},
+    {"start": "2099-04-27T00:00:00Z", "price_gross": 0.55, "is_forecast": true}
+  ],
+  "balance_pln": 12.34
+}

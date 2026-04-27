@@ -1,13 +1,17 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlmodel import Field, SQLModel
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Setting(SQLModel, table=True):
     key: str = Field(primary_key=True)
     value: str
     is_secret: bool = False
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow_naive)
 
 
 class PstrykPrice(SQLModel, table=True):
@@ -15,7 +19,7 @@ class PstrykPrice(SQLModel, table=True):
     price_pln_per_kwh: float
     kind: str  # 'historical' | 'forecast'
     raw_json: str | None = None
-    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    fetched_at: datetime = Field(default_factory=_utcnow_naive)
 
 
 class MeterReading(SQLModel, table=True):
@@ -30,4 +34,4 @@ class DailyAggregate(SQLModel, table=True):
     kwh: float
     avg_price_pln_per_kwh: float
     cost_pln: float
-    computed_at: datetime = Field(default_factory=datetime.utcnow)
+    computed_at: datetime = Field(default_factory=_utcnow_naive)

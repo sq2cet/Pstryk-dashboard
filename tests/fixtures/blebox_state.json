@@ -1,0 +1,36 @@
+{
+  "device_state": {
+    "device": {
+      "deviceName": "kitchen-meter",
+      "type": "switchBoxD",
+      "product": "switchBoxD",
+      "apiLevel": "20200831",
+      "id": "abc123"
+    }
+  },
+  "relay_extended_state": {
+    "relays": [
+      {"relay": 0, "state": 1},
+      {"relay": 1, "state": 0}
+    ],
+    "powerMeasuring": {
+      "enabled": 1,
+      "powerConsumption": [
+        {"periodS": 60, "value": 0.012},
+        {"periodS": 3600, "value": 0.521}
+      ]
+    },
+    "sensors": [
+      {"type": "activePower", "value": 520, "trend": 0, "state": 4}
+    ]
+  },
+  "multisensor_state": {
+    "multiSensor": {
+      "sensors": [
+        {"type": "activePower", "value": 1234.5},
+        {"type": "energy", "value": 87.65},
+        {"type": "voltage", "value": 230.1}
+      ]
+    }
+  }
+}
