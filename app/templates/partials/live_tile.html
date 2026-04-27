@@ -11,16 +11,13 @@
           <span class="muted">—</span>
         {% endif %}
       </div>
-    </div>
-    <div class="live-cell">
-      <div class="live-label">Price</div>
-      <div class="live-value">
+      <div class="live-sub">
         {% if current_price_pln_per_kwh is not none %}
-          {{ "%.4f"|format(current_price_pln_per_kwh) }} <small>PLN/kWh</small>
+          {{ "%.4f"|format(current_price_pln_per_kwh) }} <small class="muted">PLN/kWh</small>
           {% if is_cheap_now %}<span class="pill pill-ok">cheap</span>{% endif %}
           {% if is_expensive_now %}<span class="pill pill-warn">expensive</span>{% endif %}
         {% else %}
-          <span class="muted">—</span>
+          <span class="muted small">—</span>
         {% endif %}
       </div>
     </div>
@@ -28,53 +25,28 @@
       <div class="live-label">Today</div>
       <div class="live-value">
         {{ "%.2f"|format(today_kwh) }} <small>kWh</small>
-        <span class="muted small"> · {{ "%.2f"|format(today_cost_pln) }} PLN</span>
       </div>
+      <div class="live-sub muted small">{{ "%.2f"|format(today_cost_pln) }} PLN</div>
     </div>
     <div class="live-cell">
       <div class="live-label">This month</div>
       <div class="live-value">
         {{ "%.1f"|format(month_kwh) }} <small>kWh</small>
-        <span class="muted small"> · {{ "%.2f"|format(month_cost_pln) }} PLN</span>
       </div>
+      <div class="live-sub muted small">{{ "%.2f"|format(month_cost_pln) }} PLN</div>
     </div>
     <div class="live-cell">
       <div class="live-label">This year</div>
       <div class="live-value">
         {{ "%.0f"|format(year_kwh) }} <small>kWh</small>
-        <span class="muted small"> · {{ "%.0f"|format(year_cost_pln) }} PLN</span>
       </div>
+      <div class="live-sub muted small">{{ "%.0f"|format(year_cost_pln) }} PLN</div>
     </div>
   </div>
 </div>
 
 {% if reading and (reading.phase_l1 or reading.phase_l2 or reading.phase_l3) %}
 {% set phases = [("L1", reading.phase_l1), ("L2", reading.phase_l2), ("L3", reading.phase_l3)] %}
-<div class="tile-section">
-  <h3 class="tile-section-title">Per phase</h3>
-  <div class="phase-grid">
-    {% for label, p in phases %}
-      <div class="phase-cell">
-        <div class="live-label">{{ label }}</div>
-        <div class="phase-power">
-          {% if p and p.active_power_w is not none %}
-            {{ "%.0f"|format(p.active_power_w) }} <small>W</small>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </div>
-        <div class="phase-meta">
-          {% if p and p.voltage_v is not none %}<span>{{ "%.1f"|format(p.voltage_v) }} <small class="muted">V</small></span>{% endif %}
-          {% if p and p.current_a is not none %}<span>{{ "%.2f"|format(p.current_a) }} <small class="muted">A</small></span>{% endif %}
-          {% if p and p.power_factor is not none %}<span>PF {{ "%.2f"|format(p.power_factor) }}</span>{% endif %}
-          {% if p and p.apparent_power_va is not none %}<span>{{ "%.0f"|format(p.apparent_power_va) }} <small class="muted">VA</small></span>{% endif %}
-          {% if p and p.reactive_power_var is not none %}<span>{{ "%.0f"|format(p.reactive_power_var) }} <small class="muted">var</small></span>{% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-</div>
-
 <div class="tile-section">
   <h3 class="tile-section-title">Diagnostics · per phase</h3>
   <div class="diag-table-wrap">

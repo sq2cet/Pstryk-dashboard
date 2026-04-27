@@ -102,6 +102,7 @@ a { color: var(--accent); }
 .live-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .live-value { font-size: 1.6rem; font-weight: 600; }
 .live-value small { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+.live-sub { margin-top: 0.15rem; font-size: 0.95rem; }
 
 .chart-card { margin-top: 1rem; }
 .chart-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.75rem; }
