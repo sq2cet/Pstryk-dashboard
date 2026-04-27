@@ -105,11 +105,21 @@ def test_parse_multisensor_filters_to_id0_and_converts_units() -> None:
 
 def test_parse_multisensor_extracts_per_phase() -> None:
     reading = parse_multisensor_state(FIXTURE["multisensor_state"])
-    assert reading.phase_l1.active_power_w == 151.0
-    assert reading.phase_l1.voltage_v == pytest.approx(244.8)
-    assert reading.phase_l1.current_a == pytest.approx(1.382)
+    p1 = reading.phase_l1
+    assert p1.active_power_w == 151.0
+    assert p1.reactive_power_var == -251.0
+    assert p1.apparent_power_va == 338.0
+    assert p1.voltage_v == pytest.approx(244.8)
+    assert p1.current_a == pytest.approx(1.382)
+    assert p1.frequency_hz == pytest.approx(50.050)
+    assert p1.forward_active_energy_kwh == pytest.approx(31.934)
+    assert p1.reverse_active_energy_kwh == pytest.approx(0.0)
+    assert p1.reverse_reactive_energy_varh == 25083.0
+    assert p1.apparent_energy_vah == 50282.0
+    # Power factor = |151| / 338
+    assert p1.power_factor == pytest.approx(151 / 338, abs=1e-3)
+    # Lighter coverage on L2/L3
     assert reading.phase_l2.active_power_w == 267.0
-    assert reading.phase_l3.active_power_w == 102.0
     assert reading.phase_l3.current_a == pytest.approx(1.020)
 
 

@@ -52,8 +52,26 @@ class BleBoxDevice:
 @dataclass(frozen=True)
 class PhaseReading:
     active_power_w: float | None = None
+    reactive_power_var: float | None = None
+    apparent_power_va: float | None = None
     voltage_v: float | None = None
     current_a: float | None = None
+    frequency_hz: float | None = None
+    forward_active_energy_kwh: float | None = None
+    reverse_active_energy_kwh: float | None = None
+    forward_reactive_energy_varh: float | None = None
+    reverse_reactive_energy_varh: float | None = None
+    apparent_energy_vah: float | None = None
+
+    @property
+    def power_factor(self) -> float | None:
+        if (
+            self.active_power_w is None
+            or self.apparent_power_va is None
+            or self.apparent_power_va == 0
+        ):
+            return None
+        return min(abs(self.active_power_w) / self.apparent_power_va, 1.0)
 
 
 @dataclass(frozen=True)
@@ -212,10 +230,21 @@ def parse_multisensor_state(payload: dict) -> BleBoxReading:
             return None
         v_dv = _find_sensor(sensors, "voltage")
         c_ma = _find_sensor(sensors, "current")
+        f_mhz = _find_sensor(sensors, "frequency")
+        fwd_wh = _find_sensor(sensors, "forwardActiveEnergy")
+        rev_wh = _find_sensor(sensors, "reverseActiveEnergy")
         return PhaseReading(
             active_power_w=_find_sensor(sensors, "activePower"),
+            reactive_power_var=_find_sensor(sensors, "reactivePower"),
+            apparent_power_va=_find_sensor(sensors, "apparentPower"),
             voltage_v=(v_dv / 10.0) if v_dv is not None else None,
             current_a=(c_ma / 1000.0) if c_ma is not None else None,
+            frequency_hz=(f_mhz / 1000.0) if f_mhz is not None else None,
+            forward_active_energy_kwh=(fwd_wh / 1000.0) if fwd_wh is not None else None,
+            reverse_active_energy_kwh=(rev_wh / 1000.0) if rev_wh is not None else None,
+            forward_reactive_energy_varh=_find_sensor(sensors, "forwardReactiveEnergy"),
+            reverse_reactive_energy_varh=_find_sensor(sensors, "reverseReactiveEnergy"),
+            apparent_energy_vah=_find_sensor(sensors, "apparentEnergy"),
         )
 
     return BleBoxReading(

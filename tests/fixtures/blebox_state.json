@@ -45,17 +45,28 @@
         {"id": 0, "type": "frequency", "value": 50060, "state": 2},
 
         {"id": 1, "type": "forwardActiveEnergy", "value": 31934, "state": 2},
+        {"id": 1, "type": "reverseActiveEnergy", "value": 0, "state": 2},
+        {"id": 1, "type": "forwardReactiveEnergy", "value": 0, "state": 2},
+        {"id": 1, "type": "reverseReactiveEnergy", "value": 25083, "state": 2},
+        {"id": 1, "type": "apparentEnergy", "value": 50282, "state": 2},
         {"id": 1, "type": "activePower", "value": 151, "state": 2},
+        {"id": 1, "type": "reactivePower", "value": -251, "state": 2},
+        {"id": 1, "type": "apparentPower", "value": 338, "state": 2},
         {"id": 1, "type": "voltage", "value": 2448, "state": 2},
         {"id": 1, "type": "current", "value": 1382, "state": 2},
+        {"id": 1, "type": "frequency", "value": 50050, "state": 2},
 
         {"id": 2, "type": "forwardActiveEnergy", "value": 44488, "state": 2},
         {"id": 2, "type": "activePower", "value": 267, "state": 2},
+        {"id": 2, "type": "reactivePower", "value": -99, "state": 2},
+        {"id": 2, "type": "apparentPower", "value": 347, "state": 2},
         {"id": 2, "type": "voltage", "value": 2444, "state": 2},
         {"id": 2, "type": "current", "value": 1414, "state": 2},
 
         {"id": 3, "type": "forwardActiveEnergy", "value": 33022, "state": 2},
         {"id": 3, "type": "activePower", "value": 102, "state": 2},
+        {"id": 3, "type": "reactivePower", "value": -181, "state": 2},
+        {"id": 3, "type": "apparentPower", "value": 250, "state": 2},
         {"id": 3, "type": "voltage", "value": 2444, "state": 2},
         {"id": 3, "type": "current", "value": 1020, "state": 2}
       ]

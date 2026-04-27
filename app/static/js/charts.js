@@ -80,12 +80,13 @@
     document.getElementById("t-min").textContent = NUM(data.totals.min_price_pln_per_kwh, 4);
     document.getElementById("t-max").textContent = NUM(data.totals.max_price_pln_per_kwh, 4);
 
-    renderCombo(labels, prices, kwh);
-    renderCostConsumption(labels, kwh, data.buckets.map((b) => b.cost_pln));
+    const cost = data.buckets.map((b) => b.cost_pln);
+    renderCombo(labels, prices, kwh, cost);
+    renderCostConsumption(labels, kwh, cost);
     renderTable(data.buckets, data.resolution);
   }
 
-  function renderCombo(labels, prices, kwh) {
+  function renderCombo(labels, prices, kwh, cost) {
     const canvas = document.getElementById("chart-combo");
     if (comboChart) comboChart.destroy();
     comboChart = new Chart(canvas, {
@@ -112,6 +113,17 @@
             spanGaps: true,
             yAxisID: "y_price",
           },
+          {
+            type: "line",
+            label: "Cost (PLN)",
+            data: cost,
+            borderColor: "#9affb6",
+            backgroundColor: "#9affb6",
+            tension: 0.2,
+            pointRadius: 0,
+            spanGaps: true,
+            yAxisID: "y_cost",
+          },
         ],
       },
       options: chartCommon({
@@ -129,6 +141,14 @@
             title: { display: true, text: "kWh" },
             grid: { display: false },
             ticks: { color: "#8a8f98" },
+          },
+          y_cost: {
+            type: "linear",
+            position: "right",
+            offset: true,
+            title: { display: true, text: "PLN" },
+            grid: { display: false },
+            ticks: { color: "#9affb6" },
           },
         },
       }),
