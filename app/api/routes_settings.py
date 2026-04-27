@@ -40,7 +40,6 @@ def post_settings(
     pstryk_poll_minutes: Annotated[str, Form()] = "",
     blebox_live_seconds: Annotated[str, Form()] = "",
     blebox_persist_seconds: Annotated[str, Form()] = "",
-    tz: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     if pstryk_api_key.strip():
         svc.set_value(session, svc.PSTRYK_API_KEY, pstryk_api_key.strip())
@@ -54,6 +53,4 @@ def post_settings(
     ):
         if raw.strip().isdigit():
             svc.set_value(session, key, raw.strip())
-    if tz.strip():
-        svc.set_value(session, svc.TIMEZONE, tz.strip())
     return RedirectResponse(url="/settings?saved=1", status_code=303)

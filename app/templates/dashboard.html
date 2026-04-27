@@ -119,5 +119,5 @@
   </div>
 </section>
 
-<script src="{{ url_for('static', path='js/charts.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/charts.js') }}?v={{ asset_version }}" defer></script>
 {% endblock %}

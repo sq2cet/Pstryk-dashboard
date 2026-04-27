@@ -294,7 +294,27 @@
     liveChart.update("none");
   }
 
+  // Auto-refresh charts whenever the backfill banner disappears
+  // (HTMX swaps the #backfill-status div to empty once the job
+  // finishes). This catches the "data is now available, but the
+  // user is still looking at empty charts" case without forcing a
+  // page reload.
+  let backfillWasVisible = false;
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const target = event.detail.target;
+    if (target && target.id === "backfill-status") {
+      const nowEmpty = target.innerHTML.trim() === "";
+      if (backfillWasVisible && nowEmpty) {
+        refresh();
+      }
+      backfillWasVisible = !nowEmpty;
+    }
+  });
+
   refresh();
   refreshLivePower();
   setInterval(refreshLivePower, 5000);
+  // Also refresh the chart/table data every 5 minutes so new hours
+  // land without the user having to reload the page.
+  setInterval(refresh, 5 * 60 * 1000);
 })();

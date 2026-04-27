@@ -1,4 +1,5 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 APP_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=APP_DIR / "templates")
+# Used as a cache-busting query param on static asset URLs so a new
+# build automatically invalidates the browser's cached charts.js / app.css.
+ASSET_VERSION = str(int(time.time()))
+templates.env.globals["asset_version"] = ASSET_VERSION
 
 SessionDep = Annotated[Session, Depends(get_session)]
 

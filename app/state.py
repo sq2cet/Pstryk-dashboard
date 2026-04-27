@@ -56,7 +56,7 @@ def backfill_start() -> None:
     global backfill_status, backfill_message, backfill_chunks_done
     global backfill_rows_loaded, backfill_started_at, backfill_finished_at
     backfill_status = "running"
-    backfill_message = "Pobieranie danych historycznych..."
+    backfill_message = "Downloading historical data..."
     backfill_chunks_done = 0
     backfill_rows_loaded = 0
     backfill_started_at = datetime.utcnow()
@@ -70,7 +70,7 @@ def backfill_progress(message: str, rows_loaded_in_chunk: int) -> None:
     backfill_message = message
 
 
-def backfill_done(message: str = "Dane historyczne pobrane.") -> None:
+def backfill_done(message: str = "Historical data downloaded.") -> None:
     global backfill_status, backfill_message, backfill_finished_at
     backfill_status = "complete"
     backfill_message = message

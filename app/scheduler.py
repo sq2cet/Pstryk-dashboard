@@ -118,7 +118,7 @@ async def pstryk_backfill_all_job() -> None:
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
                 state.backfill_progress(
-                    f"Pobieranie prognozy ({len(prices)} godzin)...", len(prices)
+                    f"Downloading forecast ({len(prices)} hours)...", len(prices)
                 )
                 logger.info("Backfill forecast chunk: %d rows", len(prices))
             except PstrykAPIError as exc:
@@ -138,7 +138,7 @@ async def pstryk_backfill_all_job() -> None:
                         window_end.date(),
                     )
                     state.backfill_progress(
-                        f"Sprawdzanie {window_start.date()} (już pobrane)...", 0
+                        f"Checking {window_start.date()} (already downloaded)...", 0
                     )
                     consecutive_empty = 0
                     continue
@@ -152,7 +152,7 @@ async def pstryk_backfill_all_job() -> None:
                 with Session(engine) as session:
                     upsert_pstryk_prices(session, prices)
                 state.backfill_progress(
-                    f"Pobieranie {window_start.date()} → {window_end.date()} ({len(prices)} godzin)...",
+                    f"Downloading {window_start.date()} → {window_end.date()} ({len(prices)} hours)...",
                     len(prices),
                 )
                 logger.info(
@@ -174,12 +174,12 @@ async def pstryk_backfill_all_job() -> None:
                     consecutive_empty = 0
 
         state.backfill_done(
-            f"Zakończono. Pobrano {state.backfill_rows_loaded} godzin "
-            f"w {state.backfill_chunks_done} fragmentach."
+            f"Done. Downloaded {state.backfill_rows_loaded} hours "
+            f"in {state.backfill_chunks_done} chunks."
         )
     except Exception as exc:
         logger.exception("Pstryk backfill crashed")
-        state.backfill_failed(f"Błąd pobierania: {exc}")
+        state.backfill_failed(f"Download error: {exc}")
 
 
 def _chunk_has_full_kwh(window_start: datetime, window_end: datetime) -> bool:

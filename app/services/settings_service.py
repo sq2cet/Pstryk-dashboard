@@ -23,7 +23,10 @@ BLEBOX_PORT = "blebox_port"
 PSTRYK_POLL_MINUTES = "pstryk_poll_minutes"
 BLEBOX_LIVE_SECONDS = "blebox_live_seconds"
 BLEBOX_PERSIST_SECONDS = "blebox_persist_seconds"
-TIMEZONE = "tz"
+# Hardcoded — Pstryk is a Polish tariff, the meter is in Poland, not
+# user-configurable. Kept as a constant so the rest of the app keeps a
+# single source of truth.
+TIMEZONE_VALUE = "Europe/Warsaw"
 
 _SECRET_KEYS = frozenset({PSTRYK_API_KEY})
 
@@ -32,7 +35,6 @@ DEFAULTS: dict[str, str] = {
     PSTRYK_POLL_MINUTES: "60",
     BLEBOX_LIVE_SECONDS: "5",
     BLEBOX_PERSIST_SECONDS: "60",
-    TIMEZONE: "Europe/Warsaw",
 }
 
 
@@ -114,7 +116,7 @@ def get_view(session: Session) -> SettingsView:
         pstryk_poll_minutes=_int_with_default(session, PSTRYK_POLL_MINUTES),
         blebox_live_seconds=_int_with_default(session, BLEBOX_LIVE_SECONDS),
         blebox_persist_seconds=_int_with_default(session, BLEBOX_PERSIST_SECONDS),
-        tz=get_value(session, TIMEZONE) or DEFAULTS[TIMEZONE],
+        tz=TIMEZONE_VALUE,
     )
 
 
