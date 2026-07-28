@@ -28,14 +28,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `chartjs-adapter-date-fns` and `chartjs-plugin-zoom` loaded from CDN
   to support time-scale navigation in the fullscreen chart.
 
-## [1.0.2] — 2026-07-?
+## [1.0.2] — 2026-04-27
 
 ### Fixed
 
 - Backfill walk produced sparse coverage that the skip-logic mistook for
   fully hydrated chunks, leaving gaps in historical data.
 
-## [1.0.1] — 2026-07-?
+## [1.0.1] — 2026-04-27
 
 ### Fixed
 
@@ -43,7 +43,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Custom date range inputs kept stale values when switching back to a
   preset range.
 
-## [1.0.0] — 2026-07-?
+## [1.0.0] — 2026-04-27
 
 ### Added
 
