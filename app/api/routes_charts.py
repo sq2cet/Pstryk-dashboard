@@ -106,19 +106,18 @@ def live_power(
     else:
         mem_start = mem_list[0].ts_utc
         db_rows = readings_in_range(session, cutoff, mem_start)
-        pts = (
-            [(r.ts_utc, r.active_power_w, r.l1_power_w, r.l2_power_w, r.l3_power_w) for r in db_rows]
-            + [mem_tuple(r) for r in mem_list]
-        )
+        pts = [
+            (r.ts_utc, r.active_power_w, r.l1_power_w, r.l2_power_w, r.l3_power_w) for r in db_rows
+        ] + [mem_tuple(r) for r in mem_list]
 
     return {
         "tz": view.tz,
         "minutes": minutes,
-        "ts":      [p[0].isoformat() + "Z" for p in pts],
+        "ts": [p[0].isoformat() + "Z" for p in pts],
         "total_w": [p[1] for p in pts],
-        "l1_w":    [p[2] for p in pts],
-        "l2_w":    [p[3] for p in pts],
-        "l3_w":    [p[4] for p in pts],
+        "l1_w": [p[2] for p in pts],
+        "l2_w": [p[3] for p in pts],
+        "l3_w": [p[4] for p in pts],
     }
 
 
