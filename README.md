@@ -9,6 +9,8 @@ from Pstryk's price forecast.
 
 ![status](https://github.com/sq2cet/Pstryk-dashboard/actions/workflows/ci.yml/badge.svg)
 
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## What you get
 
 - **Live tile** — current power (W), current price (PLN/kWh), today /
@@ -107,7 +109,7 @@ Raspberry Pi 5 / Orange Pi 5.
 mkdir -p ~/apps/pstryk-dashboard && cd ~/apps/pstryk-dashboard
 
 # Grab the compose file and env template at the version you want
-TAG=v1.0.0
+TAG=v1.1.0
 curl -O https://raw.githubusercontent.com/sq2cet/Pstryk-dashboard/${TAG}/docker-compose.yml
 curl -O https://raw.githubusercontent.com/sq2cet/Pstryk-dashboard/${TAG}/.env.example
 mv .env.example .env
