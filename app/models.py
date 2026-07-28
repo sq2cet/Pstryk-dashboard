@@ -31,6 +31,9 @@ class MeterReading(SQLModel, table=True):
     ts_utc: datetime = Field(primary_key=True)
     active_power_w: float
     energy_kwh_total: float | None = None
+    l1_power_w: float | None = None
+    l2_power_w: float | None = None
+    l3_power_w: float | None = None
     raw_json: str | None = None
 
 

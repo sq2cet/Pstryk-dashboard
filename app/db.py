@@ -21,6 +21,10 @@ def init_db() -> None:
         "pstrykprice",
         [("kwh_import", "REAL"), ("kwh_export", "REAL"), ("cost_pln", "REAL")],
     )
+    _ensure_columns(
+        "meterreading",
+        [("l1_power_w", "REAL"), ("l2_power_w", "REAL"), ("l3_power_w", "REAL")],
+    )
 
 
 def _ensure_columns(table: str, columns: list[tuple[str, str]]) -> None:

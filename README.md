@@ -15,6 +15,15 @@ from Pstryk's price forecast.
   this month / this year usage and cost.
 - **Live power chart** — last 60 minutes, 5-second resolution, total +
   per-phase L1/L2/L3 (auto-scrolls left).
+- **Fullscreen power chart** — click ⤢ on the live chart to open a
+  full-screen view with up to 24 hours of history. Scroll to zoom,
+  drag to pan. Series visibility follows the Chart.js legend (click a
+  label to hide or show a phase). Data refreshes every 5 seconds and
+  new points appear at the right edge while the view stays where you
+  left it.
+- **Error banner with retry countdown** — when Pstryk or BleBox
+  polling fails, a banner shows the error and counts down to the next
+  scheduled retry. The banner clears on its own once the error resolves.
 - **Cheapest / most-expensive hours** — top of today + tomorrow as
   soon as Pstryk publishes the next-day prices.
 - **Range explorer** — last 24 h, today, last 7 days, this/last month,

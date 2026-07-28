@@ -23,12 +23,26 @@
 <section class="card chart-card">
   <header class="chart-header">
     <h2>Live power · last 60 min</h2>
-    <span class="muted small">5 s resolution · per phase</span>
+    <div class="chart-header-actions">
+      <span class="muted small">5 s resolution · per phase</span>
+      <button type="button" id="btn-fs" class="btn-icon" title="Fullscreen" aria-label="Fullscreen">⤢</button>
+    </div>
   </header>
   <div class="chart-wrap chart-wrap-short">
     <canvas id="chart-live-power" aria-label="Live per-phase power"></canvas>
   </div>
 </section>
+
+<dialog id="fs-dialog" class="fs-dialog">
+  <header class="fs-header">
+    <h2 class="fs-title">Live power · last 24 h</h2>
+    <span class="muted small">scroll to zoom &middot; drag to pan</span>
+    <button type="button" id="fs-close" class="btn-icon" aria-label="Close">✕</button>
+  </header>
+  <div class="fs-chart-wrap">
+    <canvas id="chart-fs" aria-label="Fullscreen live power"></canvas>
+  </div>
+</dialog>
 
 <section class="card forecast-card"
          hx-get="/partials/cheapest-hours"

@@ -15,6 +15,7 @@ from app.db import get_session
 from app.models import utcnow_naive
 from app.services import settings_service as svc
 from app.services.aggregations import aggregate_range, resolve_window
+from app.services.ingest import readings_in_range
 from app.services.timeseries import (
     hour_buckets,
     hourly_consumption_kwh,
@@ -77,29 +78,47 @@ def hourly_chart(
 @router.get("/api/charts/live-power")
 def live_power(
     session: SessionDep,
-    minutes: Annotated[int, Query(ge=1, le=120)] = 60,
+    minutes: Annotated[int, Query(ge=1, le=1440)] = 60,
 ) -> dict:
-    """Return the in-memory rolling buffer of recent BleBox readings.
+    """Return BleBox readings for the requested time window.
 
-    Each point carries total active power and a per-phase breakdown.
-    Used by the live-power chart, which polls this endpoint every 5 s.
+    For windows up to 60 min the in-memory rolling buffer is used (5 s
+    resolution, full per-phase breakdown). For longer windows DB rows are
+    prepended (1 min resolution, per-phase from stored columns) and the
+    in-memory segment fills the tail. Used by the live-power chart.
     """
     view = svc.get_view(session)
     cutoff = utcnow_naive() - timedelta(minutes=minutes)
-    points = [r for r in state.recent_readings if r.ts_utc >= cutoff]
 
-    def phase_w(r, attr: str) -> float | None:
-        phase = getattr(r, attr, None)
-        return phase.active_power_w if phase is not None else None
+    mem_list = list(state.recent_readings)
+
+    def mem_tuple(r):
+        return (
+            r.ts_utc,
+            r.active_power_w,
+            r.phase_l1.active_power_w if r.phase_l1 else None,
+            r.phase_l2.active_power_w if r.phase_l2 else None,
+            r.phase_l3.active_power_w if r.phase_l3 else None,
+        )
+
+    if minutes <= 60 or not mem_list:
+        pts = [mem_tuple(r) for r in mem_list if r.ts_utc >= cutoff]
+    else:
+        mem_start = mem_list[0].ts_utc
+        db_rows = readings_in_range(session, cutoff, mem_start)
+        pts = (
+            [(r.ts_utc, r.active_power_w, r.l1_power_w, r.l2_power_w, r.l3_power_w) for r in db_rows]
+            + [mem_tuple(r) for r in mem_list]
+        )
 
     return {
         "tz": view.tz,
         "minutes": minutes,
-        "ts": [r.ts_utc.isoformat() + "Z" for r in points],
-        "total_w": [r.active_power_w for r in points],
-        "l1_w": [phase_w(r, "phase_l1") for r in points],
-        "l2_w": [phase_w(r, "phase_l2") for r in points],
-        "l3_w": [phase_w(r, "phase_l3") for r in points],
+        "ts":      [p[0].isoformat() + "Z" for p in pts],
+        "total_w": [p[1] for p in pts],
+        "l1_w":    [p[2] for p in pts],
+        "l2_w":    [p[3] for p in pts],
+        "l3_w":    [p[4] for p in pts],
     }
 
 

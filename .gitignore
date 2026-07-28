@@ -38,6 +38,9 @@ data/
 .DS_Store
 Thumbs.db
 
+# Private session state — never commit
+session-notes.md
+
 # Build artefacts
 build/
 dist/

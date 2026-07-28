@@ -324,4 +324,134 @@
   // Also refresh the chart/table data every 5 minutes so new hours
   // land without the user having to reload the page.
   setInterval(refresh, 5 * 60 * 1000);
+
+  // --- Fullscreen live-power chart (24 h, scroll-zoom + drag-pan) ---
+  let fsChart = null;
+  let fsInterval = null;
+  let fsPanCtrl = null;  // AbortController for canvas mouse listeners
+
+  function setupFsPan(canvas) {
+    if (fsPanCtrl) fsPanCtrl.abort();
+    fsPanCtrl = new AbortController();
+    const sig = { signal: fsPanCtrl.signal };
+
+    let panState = null;
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || !fsChart) return;
+      const xs = fsChart.scales.x;
+      panState = { startX: e.clientX, min: xs.min, max: xs.max };
+      canvas.style.cursor = "grabbing";
+      e.preventDefault();
+    }, sig);
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (!panState || !fsChart) return;
+      const xs = fsChart.scales.x;
+      const pixW = xs.right - xs.left;
+      if (pixW === 0) return;
+      const range = panState.max - panState.min;
+      const delta = ((e.clientX - panState.startX) / pixW) * range;
+      fsChart.options.scales.x.min = panState.min - delta;
+      fsChart.options.scales.x.max = panState.max - delta;
+      fsChart.update("none");
+    }, sig);
+
+    const endPan = () => { panState = null; canvas.style.cursor = "grab"; };
+    canvas.addEventListener("mouseup", endPan, sig);
+    canvas.addEventListener("mouseleave", endPan, sig);
+  }
+
+  async function refreshFs() {
+    const res = await fetch("/api/charts/live-power?minutes=1440");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const toXY = (vals) => data.ts.map((iso, i) => ({ x: new Date(iso).getTime(), y: vals[i] }));
+
+    if (!fsChart) {
+      const canvas = document.getElementById("chart-fs");
+      if (!canvas) return;
+      fsChart = new Chart(canvas, {
+        data: {
+          datasets: [
+            { label: "Total", data: toXY(data.total_w), borderColor: "#e6e8eb", backgroundColor: "#e6e8eb" },
+            { label: "L1",    data: toXY(data.l1_w),    borderColor: "#7ec8ff", backgroundColor: "#7ec8ff" },
+            { label: "L2",    data: toXY(data.l2_w),    borderColor: "#9affb6", backgroundColor: "#9affb6" },
+            { label: "L3",    data: toXY(data.l3_w),    borderColor: "#f5c518", backgroundColor: "#f5c518" },
+          ].map((d) => ({
+            ...d, type: "line", borderWidth: 1.5, tension: 0.1, pointRadius: 0, spanGaps: true,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: {
+              type: "time",
+              time: {
+                tooltipFormat: "HH:mm:ss",
+                displayFormats: { second: "HH:mm:ss", minute: "HH:mm", hour: "HH:mm" },
+              },
+              ticks: { color: "#8a8f98", maxTicksLimit: 12 },
+              grid: { color: "rgba(255,255,255,0.05)" },
+            },
+            y: {
+              type: "linear", position: "left",
+              title: { display: true, text: "W" },
+              grid: { color: "rgba(255,255,255,0.05)" },
+              ticks: { color: "#8a8f98" },
+            },
+          },
+          plugins: {
+            legend: { labels: { color: "#e6e8eb" } },
+            zoom: {
+              pan: { enabled: false },
+              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" },
+              limits: { x: { minRange: 60_000 } },
+            },
+          },
+        },
+      });
+      setupFsPan(canvas);
+      fsChart.resize();
+      return;
+    }
+
+    ["total_w", "l1_w", "l2_w", "l3_w"].forEach((key, i) => {
+      fsChart.data.datasets[i].data = toXY(data[key]);
+    });
+    fsChart.update("none");
+  }
+
+  function openFs() {
+    document.getElementById("fs-dialog").showModal();
+    requestAnimationFrame(async () => {
+      await refreshFs();
+      if (fsChart) fsChart.resize();
+      fsInterval = setInterval(refreshFs, 5000);
+    });
+  }
+
+  function closeFs() {
+    clearInterval(fsInterval);
+    fsInterval = null;
+    if (fsPanCtrl) { fsPanCtrl.abort(); fsPanCtrl = null; }
+    document.getElementById("fs-dialog").close();
+    if (fsChart) { fsChart.destroy(); fsChart = null; }
+  }
+
+  const btnFs = document.getElementById("btn-fs");
+  if (btnFs) {
+    btnFs.addEventListener("click", openFs);
+    document.getElementById("fs-close").addEventListener("click", closeFs);
+    document.getElementById("fs-dialog").addEventListener("close", () => {
+      clearInterval(fsInterval);
+      fsInterval = null;
+      if (fsPanCtrl) { fsPanCtrl.abort(); fsPanCtrl = null; }
+      if (fsChart) { fsChart.destroy(); fsChart = null; }
+    });
+  }
 })();

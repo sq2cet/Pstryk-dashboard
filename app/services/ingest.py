@@ -68,6 +68,9 @@ def record_meter_reading(session: Session, reading: BleBoxReading) -> MeterReadi
         ts_utc=ts,
         active_power_w=reading.active_power_w if reading.active_power_w is not None else 0.0,
         energy_kwh_total=reading.energy_kwh_total,
+        l1_power_w=reading.phase_l1.active_power_w if reading.phase_l1 else None,
+        l2_power_w=reading.phase_l2.active_power_w if reading.phase_l2 else None,
+        l3_power_w=reading.phase_l3.active_power_w if reading.phase_l3 else None,
         raw_json=json.dumps(reading.raw, separators=(",", ":")) if reading.raw else None,
     )
     session.add(row)
