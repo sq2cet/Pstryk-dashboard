@@ -160,6 +160,7 @@ a { color: var(--accent); }
 .diag-table td:first-child {
   position: sticky; left: 0; background: var(--card); z-index: 1;
 }
+.diag-table thead th:first-child { z-index: 2; }
 
 .pill {
   display: inline-block;
@@ -217,6 +218,7 @@ a { color: var(--accent); }
 .agg-table th.num, .agg-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .agg-table th:first-child,
 .agg-table td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
+.agg-table thead th:first-child { z-index: 2; }
 .agg-table .row-now { background: rgba(245, 197, 24, 0.08); }
 
 /* --- Fullscreen live-power chart --- */
