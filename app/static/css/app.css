@@ -115,7 +115,7 @@ a { color: var(--accent); }
 .chart-header h2 { margin: 0; font-size: 1.05rem; }
 .chart-header .small { font-size: 0.78rem; }
 .chart-wrap { position: relative; height: 320px; }
-.chart-wrap-short { height: 220px; }
+.chart-wrap-short { height: 440px; }
 
 .tile-section { margin-bottom: 1rem; }
 .tile-section:last-child { margin-bottom: 0; }
@@ -300,7 +300,7 @@ dialog[open].fs-dialog { display: flex; flex-direction: column; }
     height: 220px;
   }
   .chart-wrap-short {
-    height: 160px;
+    height: 320px;
   }
 
   .chart-header {

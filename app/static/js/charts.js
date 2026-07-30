@@ -281,7 +281,7 @@
               y: {
                 type: "linear",
                 position: "left",
-                title: { display: true, text: "W" },
+                title: { display: false },
                 grid: { color: "rgba(255,255,255,0.05)" },
                 ticks: { color: "#8a8f98" },
               },
