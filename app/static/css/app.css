@@ -215,6 +215,8 @@ a { color: var(--accent); }
 .agg-table th, .agg-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: left; }
 .agg-table thead th { position: sticky; top: 0; background: var(--card); color: var(--muted); font-weight: 600; text-align: left; }
 .agg-table th.num, .agg-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.agg-table th:first-child,
+.agg-table td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
 .agg-table .row-now { background: rgba(245, 197, 24, 0.08); }
 
 /* --- Fullscreen live-power chart --- */
