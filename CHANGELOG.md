@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.10] — 2026-07-30
+
+### Fixed
+
+- **Sticky Bucket column in per-bucket aggregates table** — the "Bucket"
+  column now stays visible while scrolling horizontally, matching the
+  behaviour of the "Phase" column in the Diagnostic per-phase table.
+
 ## [1.2.0] — 2026-07-30
 
 ### Added
