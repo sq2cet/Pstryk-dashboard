@@ -251,3 +251,57 @@ dialog[open].fs-dialog { display: flex; flex-direction: column; }
 .range-btn:hover { background: var(--card); }
 .range-btn--active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
 
+/* === Mobile responsive (viewport < 640px) === */
+@media (max-width: 639px) {
+  .topbar {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.88rem;
+  }
+  nav a {
+    margin-left: 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .live-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .forecast-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .phase-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-bar label {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .totals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .diag-table,
+  .agg-table {
+    font-size: 0.78rem;
+  }
+
+  .chart-wrap {
+    height: 220px;
+  }
+  .chart-wrap-short {
+    height: 160px;
+  }
+
+  .fs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
