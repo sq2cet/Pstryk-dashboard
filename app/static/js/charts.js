@@ -122,17 +122,18 @@
             type: "linear",
             position: "left",
             grid: { color: "rgba(255,255,255,0.05)" },
-            ticks: { color: "#8a8f98", callback: unitTick("PLN/kWh") },
+            ticks: { color: "#8a8f98" },
             afterFit: (sc) => { sc.width = Math.max(sc.width, 72); },
           },
           y_kwh: {
             type: "linear",
             position: "right",
             grid: { display: false },
-            ticks: { color: "#8a8f98", callback: unitTick("kWh") },
+            ticks: { color: "#8a8f98" },
           },
         },
       }),
+      plugins: [makeUnitPlugin({ y_price: "PLN/kWh", y_kwh: "kWh" })],
     });
   }
 
@@ -172,25 +173,47 @@
             type: "linear",
             position: "left",
             grid: { color: "rgba(255,255,255,0.05)" },
-            ticks: { color: "#8a8f98", callback: unitTick("PLN") },
+            ticks: { color: "#8a8f98" },
             afterFit: (sc) => { sc.width = Math.max(sc.width, 48); },
           },
           y_kwh: {
             type: "linear",
             position: "right",
             grid: { display: false },
-            ticks: { color: "#8a8f98", callback: unitTick("kWh") },
+            ticks: { color: "#8a8f98" },
           },
         },
       }),
+      plugins: [makeUnitPlugin({ y_cost: "PLN", y_kwh: "kWh" })],
     });
   }
 
-  // Returns a ticks.callback that prepends a unit label as a second line
-  // above the topmost tick value. Chart.js renders array returns as
-  // multi-line labels and allocates the extra vertical space automatically.
-  const unitTick = (unit) => (val, idx, ticks) =>
-    idx === ticks.length - 1 ? [unit, val] : val;
+  // Draws unit labels above the topmost tick of each axis in afterDraw —
+  // runs after the legend, so the text always renders on top of it.
+  function makeUnitPlugin(axisUnits) {
+    return {
+      id: "unitLabels",
+      afterDraw(chart) {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = "#8a8f98";
+        ctx.textBaseline = "bottom";
+        for (const [axisId, unit] of Object.entries(axisUnits)) {
+          const sc = chart.scales[axisId];
+          if (!sc) continue;
+          if (sc.position === "right") {
+            ctx.textAlign = "left";
+            ctx.fillText(unit, sc.left + 4, sc.top);
+          } else {
+            ctx.textAlign = "right";
+            ctx.fillText(unit, sc.right - 4, sc.top);
+          }
+        }
+        ctx.restore();
+      },
+    };
+  }
 
   function chartCommon({ scales }) {
     return {
@@ -204,7 +227,7 @@
           grid: { color: "rgba(255,255,255,0.05)" },
         },
       },
-      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 }, margin: 16 } },
+      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 } } },
     };
   }
 
@@ -286,12 +309,13 @@
                 type: "linear",
                 position: "left",
                 grid: { color: "rgba(255,255,255,0.05)" },
-                ticks: { color: "#8a8f98", callback: unitTick("W") },
+                ticks: { color: "#8a8f98" },
               },
             },
           }),
           animation: false,
         },
+        plugins: [makeUnitPlugin({ y: "W" })],
       });
       return;
     }
