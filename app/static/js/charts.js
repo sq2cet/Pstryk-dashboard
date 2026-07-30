@@ -117,22 +117,25 @@
           },
         ],
       },
-      options: chartCommon({
-        scales: {
-          y_price: {
-            type: "linear",
-            position: "left",
-            grid: { color: "rgba(255,255,255,0.05)" },
-            ticks: { color: "#8a8f98" },
+      options: {
+        ...chartCommon({
+          scales: {
+            y_price: {
+              type: "linear",
+              position: "left",
+              grid: { color: "rgba(255,255,255,0.05)" },
+              ticks: { color: "#8a8f98" },
+            },
+            y_kwh: {
+              type: "linear",
+              position: "right",
+              grid: { display: false },
+              ticks: { color: "#8a8f98" },
+            },
           },
-          y_kwh: {
-            type: "linear",
-            position: "right",
-            grid: { display: false },
-            ticks: { color: "#8a8f98" },
-          },
-        },
-      }),
+        }),
+        layout: { padding: { top: 14 } },
+      },
     });
   }
 
@@ -167,28 +170,31 @@
           },
         ],
       },
-      options: chartCommon({
-        scales: {
-          y_cost: {
-            type: "linear",
-            position: "left",
-            grid: { color: "rgba(255,255,255,0.05)" },
-            ticks: { color: "#8a8f98" },
+      options: {
+        ...chartCommon({
+          scales: {
+            y_cost: {
+              type: "linear",
+              position: "left",
+              grid: { color: "rgba(255,255,255,0.05)" },
+              ticks: { color: "#8a8f98" },
+            },
+            y_kwh: {
+              type: "linear",
+              position: "right",
+              grid: { display: false },
+              ticks: { color: "#8a8f98" },
+            },
           },
-          y_kwh: {
-            type: "linear",
-            position: "right",
-            grid: { display: false },
-            ticks: { color: "#8a8f98" },
-          },
-        },
-      }),
+        }),
+        layout: { padding: { top: 14 } },
+      },
     });
   }
 
-  // Draws a compact unit label (e.g. "W", "kWh") at the top of a y-axis,
-  // above the topmost tick value, so no horizontal space is wasted on a
-  // rotated axis title.
+  // Draws a compact unit label (e.g. "W", "kWh") in the padding strip above
+  // the chart area, so it appears as a column header for the y-axis ticks.
+  // Requires layout.padding.top >= 14 on the chart to have room to draw.
   function yTopLabel(scaleId, text) {
     return {
       id: `ytl_${scaleId}`,
@@ -199,13 +205,14 @@
         ctx.save();
         ctx.font = '10px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
         ctx.fillStyle = "#8a8f98";
-        ctx.textBaseline = "top";
+        ctx.textBaseline = "bottom";
+        const y = chart.chartArea.top - 3;
         if (sc.position === "right") {
           ctx.textAlign = "left";
-          ctx.fillText(text, sc.left + 4, sc.top + 2);
+          ctx.fillText(text, sc.left + 4, y);
         } else {
           ctx.textAlign = "right";
-          ctx.fillText(text, sc.right - 2, sc.top + 2);
+          ctx.fillText(text, sc.right - 2, y);
         }
         ctx.restore();
       },
@@ -312,6 +319,7 @@
             },
           }),
           animation: false,
+          layout: { padding: { top: 14 } },
         },
       });
       return;
