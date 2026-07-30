@@ -188,31 +188,14 @@
     });
   }
 
-  // Draws unit labels one line above the topmost tick of each axis.
-  // afterLayout forces enough space between the legend and the chart area
-  // so the label has clear gap both from the legend above and the tick below.
-  // afterDraw runs last (on top of the legend) so the text is never hidden.
+  // Draws unit labels one line (14 px) above the topmost tick of each axis.
+  // Runs in afterDraw (last layer) so it renders on top of the legend.
+  // Unit labels sit in the scale's own horizontal strip (left of chartArea for
+  // left-positioned axes, right of chartArea for right-positioned axes), which
+  // the Chart.js legend never occupies — so no legend overlap occurs.
   function makeUnitPlugin(axisUnits) {
     return {
       id: "unitLabels",
-      afterLayout(chart) {
-        // Ensure at least 32 px between legend bottom and chart area top:
-        // ~14 px unit label height + 4 px gap to legend + 14 px gap to top tick.
-        const legendBottom = chart.legend?.bottom ?? 0;
-        const needed = 32;
-        const available = chart.chartArea.top - legendBottom;
-        if (available < needed) {
-          const extra = needed - available;
-          chart.chartArea.top += extra;
-          chart.chartArea.height -= extra;
-          for (const sc of Object.values(chart.scales)) {
-            if (sc.position === "left" || sc.position === "right") {
-              sc.top += extra;
-              sc.height -= extra;
-            }
-          }
-        }
-      },
       afterDraw(chart) {
         const { ctx } = chart;
         ctx.save();
@@ -222,7 +205,8 @@
         for (const [axisId, unit] of Object.entries(axisUnits)) {
           const sc = chart.scales[axisId];
           if (!sc) continue;
-          // Draw one line-height (14 px) above the chart area top.
+          // sc.top = y-pixel of the chart area top = where the max tick renders.
+          // Drawing 14 px above places the label one line-height above that tick.
           const y = sc.top - 14;
           if (sc.position === "right") {
             ctx.textAlign = "left";
