@@ -361,18 +361,19 @@
     canvas.addEventListener("mouseup", endPan, sig);
     canvas.addEventListener("mouseleave", endPan, sig);
 
-    // Touch pan support (touch-zoom via pinch is handled by chartjs-plugin-zoom)
-    const sigPassive = { signal: fsPanCtrl.signal, passive: false };
-
+    // Touch pan (single finger). preventDefault only in touchmove — calling it
+    // in touchstart suppresses pointer events that chartjs-plugin-zoom needs
+    // for pinch-zoom recognition.
     canvas.addEventListener("touchstart", (e) => {
-      if (!fsChart || e.touches.length !== 1) return;
+      if (e.touches.length > 1) { panState = null; return; }  // let pinch through
+      if (!fsChart) return;
       const xs = fsChart.scales.x;
       panState = { startX: e.touches[0].clientX, min: xs.min, max: xs.max };
-      e.preventDefault();
-    }, sigPassive);
+    }, sig);
 
     canvas.addEventListener("touchmove", (e) => {
-      if (!panState || !fsChart || e.touches.length !== 1) return;
+      if (e.touches.length > 1) { panState = null; return; }  // let pinch through
+      if (!panState || !fsChart) return;
       const xs = fsChart.scales.x;
       const pixW = xs.right - xs.left;
       if (pixW === 0) return;
@@ -381,8 +382,8 @@
       fsChart.options.scales.x.min = panState.min - delta;
       fsChart.options.scales.x.max = panState.max - delta;
       fsChart.update("none");
-      e.preventDefault();
-    }, sigPassive);
+      e.preventDefault();  // block page scroll only during actual single-touch pan
+    }, { signal: fsPanCtrl.signal, passive: false });
 
     canvas.addEventListener("touchend", endPan, sig);
     canvas.addEventListener("touchcancel", endPan, sig);
