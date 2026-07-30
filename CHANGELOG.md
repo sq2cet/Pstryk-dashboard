@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-07-30
+
+### Added
+
+- **Pinch-zoom in fullscreen chart** — two-finger pinch gesture zooms the
+  time axis on iOS/Android. Manual touch-distance tracking replaces the
+  chartjs-plugin-zoom pinch (which used pointer events, unreliable inside
+  `<dialog>` on iOS Safari). Minimum visible range is 1 minute.
+- **Unit labels above y-axis columns** — "W", "PLN/kWh", "PLN", "kWh" now
+  appear as column headers directly above their respective y-axis tick values
+  on all three charts. Rendered as a Chart.js `afterDraw` plugin so they
+  always appear on top of the legend.
+
+### Changed
+
+- **Live power chart height** — doubled from 220 px to 440 px on desktop
+  (320 px on mobile) so more waveform detail is visible without opening
+  fullscreen.
+- **Fullscreen button** — ⤢ button right-aligned in the chart header via
+  `margin-left: auto` on the flex container.
+- **Price & consumption legend** — two-line layout on mobile (one dataset per
+  line) via `fullSize: false`, matching the visual style of the Cost &
+  consumption chart.
+
 ## [1.1.0] — 2026-07-28
 
 ### Added
