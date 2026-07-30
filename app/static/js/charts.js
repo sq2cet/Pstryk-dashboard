@@ -188,11 +188,31 @@
     });
   }
 
-  // Draws unit labels above the topmost tick of each axis in afterDraw —
-  // runs after the legend, so the text always renders on top of it.
+  // Draws unit labels one line above the topmost tick of each axis.
+  // afterLayout forces enough space between the legend and the chart area
+  // so the label has clear gap both from the legend above and the tick below.
+  // afterDraw runs last (on top of the legend) so the text is never hidden.
   function makeUnitPlugin(axisUnits) {
     return {
       id: "unitLabels",
+      afterLayout(chart) {
+        // Ensure at least 32 px between legend bottom and chart area top:
+        // ~14 px unit label height + 4 px gap to legend + 14 px gap to top tick.
+        const legendBottom = chart.legend?.bottom ?? 0;
+        const needed = 32;
+        const available = chart.chartArea.top - legendBottom;
+        if (available < needed) {
+          const extra = needed - available;
+          chart.chartArea.top += extra;
+          chart.chartArea.height -= extra;
+          for (const sc of Object.values(chart.scales)) {
+            if (sc.position === "left" || sc.position === "right") {
+              sc.top += extra;
+              sc.height -= extra;
+            }
+          }
+        }
+      },
       afterDraw(chart) {
         const { ctx } = chart;
         ctx.save();
@@ -202,12 +222,14 @@
         for (const [axisId, unit] of Object.entries(axisUnits)) {
           const sc = chart.scales[axisId];
           if (!sc) continue;
+          // Draw one line-height (14 px) above the chart area top.
+          const y = sc.top - 14;
           if (sc.position === "right") {
             ctx.textAlign = "left";
-            ctx.fillText(unit, sc.left + 4, sc.top);
+            ctx.fillText(unit, sc.left + 4, y);
           } else {
             ctx.textAlign = "right";
-            ctx.fillText(unit, sc.right - 4, sc.top);
+            ctx.fillText(unit, sc.right - 4, y);
           }
         }
         ctx.restore();
