@@ -123,6 +123,7 @@
             position: "left",
             grid: { color: "rgba(255,255,255,0.05)" },
             ticks: { color: "#8a8f98", callback: unitTick("PLN/kWh") },
+            afterFit: (sc) => { sc.width = Math.max(sc.width, 72); },
           },
           y_kwh: {
             type: "linear",
@@ -172,6 +173,7 @@
             position: "left",
             grid: { color: "rgba(255,255,255,0.05)" },
             ticks: { color: "#8a8f98", callback: unitTick("PLN") },
+            afterFit: (sc) => { sc.width = Math.max(sc.width, 48); },
           },
           y_kwh: {
             type: "linear",
@@ -202,7 +204,7 @@
           grid: { color: "rgba(255,255,255,0.05)" },
         },
       },
-      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 } } },
+      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 }, margin: 16 } },
     };
   }
 
