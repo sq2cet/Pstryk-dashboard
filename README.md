@@ -109,7 +109,7 @@ Raspberry Pi 5 / Orange Pi 5.
 mkdir -p ~/apps/pstryk-dashboard && cd ~/apps/pstryk-dashboard
 
 # Grab the compose file and env template at the version you want
-TAG=v1.2.10
+TAG=v1.2.11
 curl -O https://raw.githubusercontent.com/sq2cet/Pstryk-dashboard/${TAG}/docker-compose.yml
 curl -O https://raw.githubusercontent.com/sq2cet/Pstryk-dashboard/${TAG}/.env.example
 mv .env.example .env

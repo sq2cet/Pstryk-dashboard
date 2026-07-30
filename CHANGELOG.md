@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.11] — 2026-07-30
+
+### Fixed
+
+- **Sticky corner cell in both tables** — "Bucket" and "Phase" header cells
+  now stay visible when scrolling both vertically and horizontally. The
+  corner cell (`thead th:first-child`) needs `z-index: 2` to sit above
+  other sticky-top header cells, which otherwise overlapped it on vertical
+  scroll.
+
 ## [1.2.10] — 2026-07-30
 
 ### Fixed
