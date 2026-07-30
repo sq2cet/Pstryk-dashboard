@@ -132,6 +132,9 @@
             ticks: { color: "#8a8f98" },
           },
         },
+        // fullSize:false limits legend to chart-area width, forcing items to
+        // wrap to two lines when combined text exceeds that width on mobile.
+        legendOptions: { fullSize: false },
       }),
       plugins: [makeUnitPlugin({ y_price: "PLN/kWh", y_kwh: "kWh" })],
     });
@@ -189,13 +192,31 @@
   }
 
   // Draws unit labels one line (14 px) above the topmost tick of each axis.
-  // Runs in afterDraw (last layer) so it renders on top of the legend.
-  // Unit labels sit in the scale's own horizontal strip (left of chartArea for
-  // left-positioned axes, right of chartArea for right-positioned axes), which
-  // the Chart.js legend never occupies — so no legend overlap occurs.
+  // afterLayout pushes the chart area down to create room between the legend
+  // and the unit label; sc.configure() is called so getPixelForValue() uses
+  // the updated sc.top and tick positions shift with the chart area.
+  // afterDraw runs last, on top of the legend, so text is never hidden.
   function makeUnitPlugin(axisUnits) {
     return {
       id: "unitLabels",
+      afterLayout(chart) {
+        const legendBottom = chart.legend?.bottom ?? 0;
+        // Need 32 px: 14 px unit label + 4 px gap to legend + 14 px gap to top tick.
+        const needed = 32;
+        const available = chart.chartArea.top - legendBottom;
+        if (available >= needed) return;
+        const extra = needed - available;
+        chart.chartArea.top += extra;
+        chart.chartArea.height -= extra;
+        for (const sc of Object.values(chart.scales)) {
+          if (sc.position !== "left" && sc.position !== "right") continue;
+          sc.top += extra;
+          sc.height -= extra;
+          // Recompute _startPixel/_endPixel/_length from the new sc.top so
+          // getPixelForValue() (and thus tick rendering) uses the new position.
+          sc.configure?.();
+        }
+      },
       afterDraw(chart) {
         const { ctx } = chart;
         ctx.save();
@@ -205,8 +226,6 @@
         for (const [axisId, unit] of Object.entries(axisUnits)) {
           const sc = chart.scales[axisId];
           if (!sc) continue;
-          // sc.top = y-pixel of the chart area top = where the max tick renders.
-          // Drawing 14 px above places the label one line-height above that tick.
           const y = sc.top - 14;
           if (sc.position === "right") {
             ctx.textAlign = "left";
@@ -221,7 +240,7 @@
     };
   }
 
-  function chartCommon({ scales }) {
+  function chartCommon({ scales, legendOptions = {} }) {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -233,7 +252,7 @@
           grid: { color: "rgba(255,255,255,0.05)" },
         },
       },
-      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 } } },
+      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 }, ...legendOptions } },
     };
   }
 
