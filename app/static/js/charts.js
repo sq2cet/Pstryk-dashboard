@@ -336,6 +336,7 @@
     const sig = { signal: fsPanCtrl.signal };
 
     let panState = null;
+    let pinchState = null;
 
     canvas.addEventListener("mousedown", (e) => {
       if (e.button !== 0 || !fsChart) return;
@@ -361,19 +362,48 @@
     canvas.addEventListener("mouseup", endPan, sig);
     canvas.addEventListener("mouseleave", endPan, sig);
 
-    // Touch pan (single finger). preventDefault only in touchmove — calling it
-    // in touchstart suppresses pointer events that chartjs-plugin-zoom needs
-    // for pinch-zoom recognition.
+    // Touch: 1 finger = pan, 2 fingers = pinch-zoom.
+    // Manual pinch replaces chartjs-plugin-zoom pinch — pointer events from
+    // multi-touch are unreliable inside <dialog> on iOS Safari.
     canvas.addEventListener("touchstart", (e) => {
-      if (e.touches.length > 1) { panState = null; return; }  // let pinch through
-      if (!fsChart) return;
+      if (e.touches.length === 2) {
+        panState = null;
+        if (!fsChart) return;
+        const xs = fsChart.scales.x;
+        pinchState = {
+          dist: Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY,
+          ),
+          min: xs.min,
+          max: xs.max,
+        };
+        return;
+      }
+      pinchState = null;
+      if (e.touches.length !== 1 || !fsChart) return;
       const xs = fsChart.scales.x;
       panState = { startX: e.touches[0].clientX, min: xs.min, max: xs.max };
     }, sig);
 
     canvas.addEventListener("touchmove", (e) => {
-      if (e.touches.length > 1) { panState = null; return; }  // let pinch through
-      if (!panState || !fsChart) return;
+      if (e.touches.length === 2 && pinchState && fsChart) {
+        const d = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        if (pinchState.dist === 0) return;
+        const scale = d / pinchState.dist;  // > 1: fingers spread → zoom in
+        const newRange = (pinchState.max - pinchState.min) / scale;
+        if (newRange < 60_000) return;
+        const mid = (pinchState.min + pinchState.max) / 2;
+        fsChart.options.scales.x.min = mid - newRange / 2;
+        fsChart.options.scales.x.max = mid + newRange / 2;
+        fsChart.update("none");
+        e.preventDefault();
+        return;
+      }
+      if (e.touches.length !== 1 || !panState || !fsChart) return;
       const xs = fsChart.scales.x;
       const pixW = xs.right - xs.left;
       if (pixW === 0) return;
@@ -382,11 +412,15 @@
       fsChart.options.scales.x.min = panState.min - delta;
       fsChart.options.scales.x.max = panState.max - delta;
       fsChart.update("none");
-      e.preventDefault();  // block page scroll only during actual single-touch pan
+      e.preventDefault();
     }, { signal: fsPanCtrl.signal, passive: false });
 
-    canvas.addEventListener("touchend", endPan, sig);
-    canvas.addEventListener("touchcancel", endPan, sig);
+    const endTouch = (e) => {
+      if (e.touches.length < 2) pinchState = null;
+      if (e.touches.length === 0) endPan();
+    };
+    canvas.addEventListener("touchend", endTouch, sig);
+    canvas.addEventListener("touchcancel", endTouch, sig);
   }
 
   async function refreshFs() {
@@ -436,7 +470,7 @@
             legend: { labels: { color: "#e6e8eb" } },
             zoom: {
               pan: { enabled: false },
-              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" },
+              zoom: { wheel: { enabled: true }, pinch: { enabled: false }, mode: "x" },
               limits: { x: { minRange: 60_000 } },
             },
           },

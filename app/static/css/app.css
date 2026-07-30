@@ -303,6 +303,15 @@ dialog[open].fs-dialog { display: flex; flex-direction: column; }
     height: 160px;
   }
 
+  .chart-header {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .chart-header h2 {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
   .fs-header {
     flex-direction: column;
     align-items: flex-start;
