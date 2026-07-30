@@ -91,6 +91,7 @@
     const canvas = document.getElementById("chart-combo");
     if (comboChart) comboChart.destroy();
     comboChart = new Chart(canvas, {
+      plugins: [yTopLabel("y_price", "PLN/kWh"), yTopLabel("y_kwh", "kWh")],
       data: {
         labels,
         datasets: [
@@ -121,14 +122,12 @@
           y_price: {
             type: "linear",
             position: "left",
-            title: { display: true, text: "PLN/kWh" },
             grid: { color: "rgba(255,255,255,0.05)" },
             ticks: { color: "#8a8f98" },
           },
           y_kwh: {
             type: "linear",
             position: "right",
-            title: { display: true, text: "kWh" },
             grid: { display: false },
             ticks: { color: "#8a8f98" },
           },
@@ -141,6 +140,7 @@
     const canvas = document.getElementById("chart-cost-consumption");
     if (costChart) costChart.destroy();
     costChart = new Chart(canvas, {
+      plugins: [yTopLabel("y_cost", "PLN"), yTopLabel("y_kwh", "kWh")],
       data: {
         labels,
         datasets: [
@@ -172,20 +172,44 @@
           y_cost: {
             type: "linear",
             position: "left",
-            title: { display: true, text: "PLN" },
             grid: { color: "rgba(255,255,255,0.05)" },
             ticks: { color: "#8a8f98" },
           },
           y_kwh: {
             type: "linear",
             position: "right",
-            title: { display: true, text: "kWh" },
             grid: { display: false },
             ticks: { color: "#8a8f98" },
           },
         },
       }),
     });
+  }
+
+  // Draws a compact unit label (e.g. "W", "kWh") at the top of a y-axis,
+  // above the topmost tick value, so no horizontal space is wasted on a
+  // rotated axis title.
+  function yTopLabel(scaleId, text) {
+    return {
+      id: `ytl_${scaleId}`,
+      afterDraw(chart) {
+        const sc = chart.scales[scaleId];
+        if (!sc) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+        ctx.fillStyle = "#8a8f98";
+        ctx.textBaseline = "top";
+        if (sc.position === "right") {
+          ctx.textAlign = "left";
+          ctx.fillText(text, sc.left + 4, sc.top + 2);
+        } else {
+          ctx.textAlign = "right";
+          ctx.fillText(text, sc.right - 2, sc.top + 2);
+        }
+        ctx.restore();
+      },
+    };
   }
 
   function chartCommon({ scales }) {
@@ -200,7 +224,7 @@
           grid: { color: "rgba(255,255,255,0.05)" },
         },
       },
-      plugins: { legend: { labels: { color: "#e6e8eb" } } },
+      plugins: { legend: { labels: { color: "#e6e8eb", padding: 4 } } },
     };
   }
 
@@ -274,6 +298,7 @@
         backgroundColor: d.borderColor,
       }));
       liveChart = new Chart(canvas, {
+        plugins: [yTopLabel("y", "W")],
         data: { labels, datasets },
         options: {
           ...chartCommon({
@@ -281,7 +306,6 @@
               y: {
                 type: "linear",
                 position: "left",
-                title: { display: false },
                 grid: { color: "rgba(255,255,255,0.05)" },
                 ticks: { color: "#8a8f98" },
               },

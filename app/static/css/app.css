@@ -111,9 +111,10 @@ a { color: var(--accent); }
 .live-sub { margin-top: 0.15rem; font-size: 0.95rem; }
 
 .chart-card { margin-top: 1rem; }
-.chart-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.75rem; }
-.chart-header h2 { margin: 0; font-size: 1.05rem; }
+.chart-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.chart-header h2 { margin: 0; font-size: 1.05rem; flex-shrink: 0; }
 .chart-header .small { font-size: 0.78rem; }
+.chart-header .btn-icon { margin-left: auto; flex-shrink: 0; }
 .chart-wrap { position: relative; height: 320px; }
 .chart-wrap-short { height: 440px; }
 
@@ -217,7 +218,6 @@ a { color: var(--accent); }
 .agg-table .row-now { background: rgba(245, 197, 24, 0.08); }
 
 /* --- Fullscreen live-power chart --- */
-.chart-header-actions { display: flex; align-items: center; gap: 0.75rem; }
 
 .btn-icon {
   background: none; border: 1px solid var(--border); border-radius: 4px;
