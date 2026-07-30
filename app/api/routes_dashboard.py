@@ -127,12 +127,28 @@ def health_status(request: Request) -> HTMLResponse:
     """
     if state.pstryk_last_error is None and state.blebox_last_error is None:
         return HTMLResponse("")
+
+    next_pstryk_iso: str | None = None
+    next_blebox_iso: str | None = None
+    sched = getattr(request.app.state, "scheduler", None)
+    if sched is not None:
+        if state.pstryk_last_error:
+            job = sched.get_job("pstryk_poll")
+            if job and job.next_run_time:
+                next_pstryk_iso = job.next_run_time.isoformat()
+        if state.blebox_last_error:
+            job = sched.get_job("blebox_live")
+            if job and job.next_run_time:
+                next_blebox_iso = job.next_run_time.isoformat()
+
     return templates.TemplateResponse(
         request,
         "partials/health_status.html",
         {
             "pstryk_error": state.pstryk_last_error,
             "blebox_error": state.blebox_last_error,
+            "next_pstryk_iso": next_pstryk_iso,
+            "next_blebox_iso": next_blebox_iso,
         },
     )
 
@@ -148,6 +164,17 @@ def backfill_status(request: Request) -> HTMLResponse:
     """
     if state.backfill_status in ("idle", "complete"):
         return HTMLResponse("")
+
+    next_retry_iso: str | None = None
+    if state.backfill_status == "failed":
+        sched = getattr(request.app.state, "scheduler", None)
+        if sched is not None:
+            for job_id in ("pstryk_backfill_daily", "pstryk_backfill"):
+                job = sched.get_job(job_id)
+                if job and job.next_run_time:
+                    next_retry_iso = job.next_run_time.isoformat()
+                    break
+
     return templates.TemplateResponse(
         request,
         "partials/backfill_status.html",
@@ -156,6 +183,7 @@ def backfill_status(request: Request) -> HTMLResponse:
             "message": state.backfill_message,
             "chunks": state.backfill_chunks_done,
             "rows": state.backfill_rows_loaded,
+            "next_retry_iso": next_retry_iso,
         },
     )
 

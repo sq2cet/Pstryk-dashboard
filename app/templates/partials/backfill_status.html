@@ -3,6 +3,9 @@
   <div>
     <strong>{% if status == 'failed' %}⚠ Download error{% else %}⏳ Downloading historical data{% endif %}</strong>
     <div class="muted small">{{ message }}</div>
+    {% if status == 'failed' and next_retry_iso %}
+      <div class="muted small">Next retry in <span class="retry-cd" data-until="{{ next_retry_iso }}">…</span></div>
+    {% endif %}
   </div>
   {% if status == 'running' %}
   <div class="muted small">
@@ -10,3 +13,21 @@
   </div>
   {% endif %}
 </div>
+{% if status == 'failed' and next_retry_iso %}
+<script>
+(function () {
+  document.querySelectorAll('.retry-cd').forEach(function (el) {
+    var until = new Date(el.dataset.until);
+    function tick() {
+      var diff = Math.max(0, Math.round((until - Date.now()) / 1000));
+      if (diff === 0) { el.textContent = 'now'; return; }
+      var m = Math.floor(diff / 60), s = diff % 60;
+      var h = Math.floor(m / 60); m = m % 60;
+      el.textContent = (h > 0 ? h + ' h ' : '') + (m > 0 ? m + ' min ' : '') + s + ' s';
+      setTimeout(tick, 1000);
+    }
+    tick();
+  });
+}());
+</script>
+{% endif %}

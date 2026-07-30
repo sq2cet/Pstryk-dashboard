@@ -1,9 +1,31 @@
 {# Visible when Pstryk or BleBox jobs reported errors recently. #}
 <div class="banner banner--warn">
   <strong>⚠ Connection issues</strong>
-  {% if pstryk_error %}<div class="small">Pstryk: {{ pstryk_error }}</div>{% endif %}
-  {% if blebox_error %}<div class="small">BleBox: {{ blebox_error }}</div>{% endif %}
-  <div class="muted small" style="margin-top: 0.4rem;">
-    Banner clears automatically on the next successful poll.
-  </div>
+  {% if pstryk_error %}
+    <div class="small">Pstryk: {{ pstryk_error }}</div>
+    {% if next_pstryk_iso %}
+      <div class="small muted">Next retry in <span class="retry-cd" data-until="{{ next_pstryk_iso }}">…</span></div>
+    {% endif %}
+  {% endif %}
+  {% if blebox_error %}
+    <div class="small">BleBox: {{ blebox_error }}</div>
+    {% if next_blebox_iso %}
+      <div class="small muted">Next retry in <span class="retry-cd" data-until="{{ next_blebox_iso }}">…</span></div>
+    {% endif %}
+  {% endif %}
 </div>
+<script>
+(function () {
+  document.querySelectorAll('.retry-cd').forEach(function (el) {
+    var until = new Date(el.dataset.until);
+    function tick() {
+      var diff = Math.max(0, Math.round((until - Date.now()) / 1000));
+      if (diff === 0) { el.textContent = 'now'; return; }
+      var m = Math.floor(diff / 60), s = diff % 60;
+      el.textContent = (m > 0 ? m + ' min ' : '') + s + ' s';
+      setTimeout(tick, 1000);
+    }
+    tick();
+  });
+}());
+</script>
